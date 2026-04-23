@@ -841,17 +841,19 @@ const LeavePage = ({ onNav }) => {
 const EmployeePage = ({ onNav }) => {
   const [view, setView] = useState("list");
   const [detail, setDetail] = useState(null);
+  const [editEmp, setEditEmp] = useState(null);
+  const [detailTab, setDetailTab] = useState("info");
 
-  const emps = [
-    { name: "Nguyễn Văn An", dept: "Engineering", role: "Senior Developer", status: "active", joined: "01/2023", email: "an.nguyen@vareal.vn", phone: "0901-xxx-xxx", contract: "Chính thức", manager: "Trần Thị Ngọc" },
-    { name: "Lê Thị Mai", dept: "Design", role: "UI/UX Designer", status: "active", joined: "03/2023", email: "mai.le@vareal.vn", phone: "0912-xxx-xxx", contract: "Chính thức", manager: "Trần Thị Ngọc" },
-    { name: "Trần Đức Hùng", dept: "Engineering", role: "Backend Developer", status: "on_leave", joined: "06/2022", email: "hung.tran@vareal.vn", phone: "0933-xxx-xxx", contract: "Chính thức", manager: "Trần Thị Ngọc" },
-    { name: "Phạm Minh Tuấn", dept: "QA", role: "QA Engineer", status: "active", joined: "09/2023", email: "tuan.pham@vareal.vn", phone: "0944-xxx-xxx", contract: "Thử việc", manager: "Trần Thị Ngọc" },
-    { name: "Hoàng Thị Lan", dept: "Design", role: "Graphic Designer", status: "on_leave", joined: "11/2022", email: "lan.hoang@vareal.vn", phone: "0955-xxx-xxx", contract: "Chính thức", manager: "Trần Thị Ngọc" },
-    { name: "Vũ Đức Minh", dept: "Engineering", role: "Frontend Developer", status: "active", joined: "02/2024", email: "minh.vu@vareal.vn", phone: "0966-xxx-xxx", contract: "Chính thức", manager: "Trần Thị Ngọc" },
-    { name: "Đỗ Thị Hương", dept: "HR", role: "HR Specialist", status: "active", joined: "04/2022", email: "huong.do@vareal.vn", phone: "0977-xxx-xxx", contract: "Chính thức", manager: "Trần Thị Ngọc" },
-    { name: "Bùi Quang Hải", dept: "Engineering", role: "DevOps Engineer", status: "active", joined: "07/2023", email: "hai.bui@vareal.vn", phone: "0988-xxx-xxx", contract: "Chính thức", manager: "Trần Thị Ngọc" },
-  ];
+  const [emps, setEmps] = useState([
+    { id: 1, name: "Nguyễn Văn An",  dept: "Engineering", role: "Senior Developer",    level: "Senior", status: "active",   joined: "01/2023", dob: "15/03/1990", gender: "Nam",  email: "an.nguyen@vareal.vn",    phone: "0901-234-567", contract: "Chính thức", manager: "Trần Thị Ngọc",    address: "Quận 1, TP.HCM" },
+    { id: 2, name: "Lê Thị Mai",     dept: "Design",      role: "UI/UX Designer",      level: "Middle", status: "active",   joined: "03/2023", dob: "22/07/1995", gender: "Nữ",   email: "mai.le@vareal.vn",       phone: "0912-345-678", contract: "Chính thức", manager: "Trần Thị Ngọc",    address: "Quận 3, TP.HCM" },
+    { id: 3, name: "Trần Đức Hùng",  dept: "Engineering", role: "Backend Developer",   level: "Senior", status: "on_leave", joined: "06/2022", dob: "08/11/1988", gender: "Nam",  email: "hung.tran@vareal.vn",    phone: "0933-456-789", contract: "Chính thức", manager: "Trần Thị Ngọc",    address: "Bình Thạnh, TP.HCM" },
+    { id: 4, name: "Phạm Minh Tuấn", dept: "QA",          role: "QA Engineer",         level: "Junior", status: "active",   joined: "09/2023", dob: "30/04/1999", gender: "Nam",  email: "tuan.pham@vareal.vn",    phone: "0944-567-890", contract: "Thử việc",  manager: "Trần Thị Ngọc",    address: "Gò Vấp, TP.HCM" },
+    { id: 5, name: "Hoàng Thị Lan",  dept: "Design",      role: "Graphic Designer",    level: "Middle", status: "on_leave", joined: "11/2022", dob: "14/09/1993", gender: "Nữ",   email: "lan.hoang@vareal.vn",    phone: "0955-678-901", contract: "Chính thức", manager: "Trần Thị Ngọc",    address: "Thủ Đức, TP.HCM" },
+    { id: 6, name: "Vũ Đức Minh",    dept: "Engineering", role: "Frontend Developer",  level: "Middle", status: "active",   joined: "02/2024", dob: "02/01/1996", gender: "Nam",  email: "minh.vu@vareal.vn",      phone: "0966-789-012", contract: "Chính thức", manager: "Trần Thị Ngọc",    address: "Tân Bình, TP.HCM" },
+    { id: 7, name: "Đỗ Thị Hương",   dept: "HR",          role: "HR Specialist",       level: "Middle", status: "active",   joined: "04/2022", dob: "19/05/1991", gender: "Nữ",   email: "huong.do@vareal.vn",     phone: "0977-890-123", contract: "Chính thức", manager: "Trần Thị Ngọc",    address: "Phú Nhuận, TP.HCM" },
+    { id: 8, name: "Bùi Quang Hải",  dept: "Engineering", role: "DevOps Engineer",     level: "Senior", status: "active",   joined: "07/2023", dob: "25/12/1987", gender: "Nam",  email: "hai.bui@vareal.vn",      phone: "0988-901-234", contract: "Chính thức", manager: "Trần Thị Ngọc",    address: "Bình Dương" },
+  ]);
 
   const dc = { Engineering: T.primary, Design: T.purple, QA: "#0891B2", HR: T.accent };
   const stM = { active: { l: "Đang làm", c: T.success, bg: T.successSoft }, on_leave: { l: "Đang nghỉ", c: T.accent, bg: T.accentSoft } };
@@ -905,7 +907,7 @@ const EmployeePage = ({ onNav }) => {
                     <TD><Badge color={e.contract === "Thử việc" ? T.warning : T.inkSoft} bg={e.contract === "Thử việc" ? T.warningSoft : T.surfaceAlt}>{e.contract}</Badge></TD>
                     <TD><Badge color={stM[e.status].c} bg={stM[e.status].bg} dot>{stM[e.status].l}</Badge></TD>
                     <TD>{e.joined}</TD>
-                    <TD><Btn v="ghost" size="sm"><Ico d={IC.chevR} size={14} /></Btn></TD>
+                    <TD onClick={e => e.stopPropagation()}><div style={{ display: "flex", gap: 4 }}><Btn v="ghost" size="sm" onClick={() => { setDetail(e); setDetailTab("info"); }}><Ico d={IC.eye} size={14} /></Btn><Btn v="ghost" size="sm" onClick={() => setEditEmp({...e})}><Ico d={IC.edit} size={14} /></Btn></div></TD>
                   </tr>
                 ))}
               </tbody>
@@ -915,12 +917,15 @@ const EmployeePage = ({ onNav }) => {
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
           {emps.map((e, i) => (
-            <Card key={i} onClick={() => setDetail(e)} style={{ padding: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+            <Card key={i} onClick={() => { setDetail(e); setDetailTab("info"); }} style={{ padding: 16, cursor: "pointer" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
                 <Avatar name={e.name} size={40} colors={[`${dc[e.dept]}40`, dc[e.dept]]} />
-                <div>
+                <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, fontFamily: T.fontD, color: T.ink }}>{e.name}</div>
                   <div style={{ fontSize: 11, color: T.inkMuted }}>{e.role}</div>
+                </div>
+                <div onClick={ev => { ev.stopPropagation(); setEditEmp({...e}); }} style={{ padding: "4px 6px", borderRadius: T.rSm, color: T.inkMuted, cursor: "pointer" }} title="Chỉnh sửa">
+                  <Ico d={IC.edit} size={14} />
                 </div>
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -934,17 +939,21 @@ const EmployeePage = ({ onNav }) => {
 
       {/* Employee Detail Modal */}
       {detail && (
-        <Modal title="Hồ sơ nhân viên" onClose={() => setDetail(null)} width={600}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px", background: T.surfaceAlt, borderRadius: T.r, marginBottom: 20 }}>
+        <Modal title="Hồ sơ nhân viên" onClose={() => setDetail(null)} width={620}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px", background: T.surfaceAlt, borderRadius: T.r, marginBottom: 16 }}>
             <Avatar name={detail.name} size={56} colors={[`${dc[detail.dept]}40`, dc[detail.dept]]} />
-            <div>
+            <div style={{ flex: 1 }}>
               <div style={{ fontSize: 18, fontWeight: 800, fontFamily: T.fontD, color: T.ink }}>{detail.name}</div>
               <div style={{ fontSize: 13, color: T.inkSoft }}>{detail.role} · {detail.dept}</div>
               <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
                 <Badge color={stM[detail.status].c} bg={stM[detail.status].bg} dot>{stM[detail.status].l}</Badge>
                 <Badge color={detail.contract === "Thử việc" ? T.warning : T.inkSoft} bg={detail.contract === "Thử việc" ? T.warningSoft : T.surfaceAlt}>{detail.contract}</Badge>
+                <Badge color={T.inkMuted} bg={T.surfaceAlt}>{detail.level}</Badge>
               </div>
             </div>
+            <Btn v="secondary" size="sm" onClick={() => { setEditEmp({...detail}); setDetail(null); }}>
+              <Ico d={IC.edit} size={14} /> Chỉnh sửa
+            </Btn>
           </div>
           <Tabs items={[
             { id: "info", label: "Thông tin" },
@@ -952,21 +961,217 @@ const EmployeePage = ({ onNav }) => {
             { id: "kpi", label: "KPI" },
             { id: "skill", label: "Năng lực" },
             { id: "contract", label: "Hợp đồng" },
-          ]} active="info" onChange={() => {}} />
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          ]} active={detailTab} onChange={setDetailTab} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0 }}>
             {[
               ["Email", detail.email],
               ["Điện thoại", detail.phone],
+              ["Ngày sinh", detail.dob],
+              ["Giới tính", detail.gender],
               ["Phòng ban", detail.dept],
+              ["Cấp bậc", detail.level],
               ["Quản lý", detail.manager],
               ["Ngày vào", detail.joined],
               ["Loại HĐ", detail.contract],
+              ["Địa chỉ", detail.address],
             ].map(([k, v], i) => (
-              <div key={i} style={{ padding: "10px 0", borderBottom: `1px solid ${T.borderLight}` }}>
+              <div key={i} style={{ padding: "10px 4px", borderBottom: `1px solid ${T.borderLight}` }}>
                 <div style={{ fontSize: 11, color: T.inkMuted, fontWeight: 600, marginBottom: 3 }}>{k}</div>
-                <div style={{ fontSize: 13, color: T.ink, fontWeight: 500 }}>{v}</div>
+                <div style={{ fontSize: 13, color: T.ink, fontWeight: 500 }}>{v || "—"}</div>
               </div>
             ))}
+          </div>
+        </Modal>
+      )}
+
+      {/* ===== EDIT EMPLOYEE MODAL ===== */}
+      {editEmp && (
+        <Modal title="Chỉnh sửa hồ sơ nhân viên" onClose={() => setEditEmp(null)} width={660}>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", background: T.surfaceAlt, borderRadius: T.r, marginBottom: 20 }}>
+            <Avatar name={editEmp.name} size={48} colors={[`${dc[editEmp.dept]}40`, dc[editEmp.dept]]} />
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.fontD, color: T.ink }}>{editEmp.name}</div>
+              <div style={{ fontSize: 12, color: T.inkMuted }}>ID: EMP-00{editEmp.id} · Vào: {editEmp.joined}</div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+            {/* ── Thông tin cá nhân ── */}
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: T.inkSoft, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12, paddingBottom: 6, borderBottom: `2px solid ${T.borderLight}` }}>
+                Thông tin cá nhân
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <Input
+                  label="Họ và tên *"
+                  value={editEmp.name}
+                  onChange={e => setEditEmp(p => ({ ...p, name: e.target.value }))}
+                />
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Giới tính</label>
+                  <select
+                    value={editEmp.gender || "Nam"}
+                    onChange={e => setEditEmp(p => ({ ...p, gender: e.target.value }))}
+                    style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box" }}
+                  >
+                    <option>Nam</option>
+                    <option>Nữ</option>
+                    <option>Khác</option>
+                  </select>
+                </div>
+                <Input
+                  label="Ngày sinh"
+                  placeholder="DD/MM/YYYY"
+                  value={editEmp.dob || ""}
+                  onChange={e => setEditEmp(p => ({ ...p, dob: e.target.value }))}
+                />
+                <Input
+                  label="Địa chỉ"
+                  value={editEmp.address || ""}
+                  onChange={e => setEditEmp(p => ({ ...p, address: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {/* ── Liên hệ ── */}
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: T.inkSoft, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12, paddingBottom: 6, borderBottom: `2px solid ${T.borderLight}` }}>
+                Thông tin liên hệ
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <Input
+                  label="Email công ty *"
+                  type="email"
+                  value={editEmp.email}
+                  onChange={e => setEditEmp(p => ({ ...p, email: e.target.value }))}
+                />
+                <Input
+                  label="Số điện thoại"
+                  value={editEmp.phone}
+                  onChange={e => setEditEmp(p => ({ ...p, phone: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {/* ── Công việc ── */}
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: T.inkSoft, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12, paddingBottom: 6, borderBottom: `2px solid ${T.borderLight}` }}>
+                Thông tin công việc
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <Input
+                  label="Vị trí / Chức danh *"
+                  value={editEmp.role}
+                  onChange={e => setEditEmp(p => ({ ...p, role: e.target.value }))}
+                />
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Phòng ban *</label>
+                  <select
+                    value={editEmp.dept}
+                    onChange={e => setEditEmp(p => ({ ...p, dept: e.target.value }))}
+                    style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box" }}
+                  >
+                    <option>Engineering</option>
+                    <option>Design</option>
+                    <option>QA</option>
+                    <option>HR</option>
+                    <option>Kế toán</option>
+                    <option>Ban lãnh đạo</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Cấp bậc</label>
+                  <select
+                    value={editEmp.level || "Middle"}
+                    onChange={e => setEditEmp(p => ({ ...p, level: e.target.value }))}
+                    style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box" }}
+                  >
+                    <option>Junior</option>
+                    <option>Middle</option>
+                    <option>Senior</option>
+                    <option>Lead</option>
+                    <option>Manager</option>
+                    <option>Director</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Quản lý trực tiếp</label>
+                  <select
+                    value={editEmp.manager}
+                    onChange={e => setEditEmp(p => ({ ...p, manager: e.target.value }))}
+                    style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box" }}
+                  >
+                    <option>Trần Thị Ngọc</option>
+                    <option>Đinh Trọng Hưng</option>
+                    <option>Lê Ngọc Minh Thư</option>
+                    <option>Nguyễn Thị Vân</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Hợp đồng & Trạng thái ── */}
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: T.inkSoft, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12, paddingBottom: 6, borderBottom: `2px solid ${T.borderLight}` }}>
+                Hợp đồng & Trạng thái
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Loại hợp đồng</label>
+                  <select
+                    value={editEmp.contract}
+                    onChange={e => setEditEmp(p => ({ ...p, contract: e.target.value }))}
+                    style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box" }}
+                  >
+                    <option>Thử việc</option>
+                    <option>Chính thức</option>
+                    <option>Hợp đồng thời vụ</option>
+                    <option>Freelance</option>
+                  </select>
+                </div>
+                <Input
+                  label="Ngày vào làm"
+                  placeholder="MM/YYYY"
+                  value={editEmp.joined}
+                  onChange={e => setEditEmp(p => ({ ...p, joined: e.target.value }))}
+                />
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Trạng thái</label>
+                  <select
+                    value={editEmp.status}
+                    onChange={e => setEditEmp(p => ({ ...p, status: e.target.value }))}
+                    style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box" }}
+                  >
+                    <option value="active">Đang làm</option>
+                    <option value="on_leave">Đang nghỉ</option>
+                    <option value="resigned">Đã nghỉ việc</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Actions ── */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 4, borderTop: `1px solid ${T.borderLight}` }}>
+              <Btn v="danger" onClick={() => {
+                if (window.confirm(`Xác nhận xóa nhân viên "${editEmp.name}"?`)) {
+                  setEmps(prev => prev.filter(e => e.id !== editEmp.id));
+                  setEditEmp(null);
+                }
+              }}>
+                Xóa nhân viên
+              </Btn>
+              <div style={{ display: "flex", gap: 10 }}>
+                <Btn v="secondary" onClick={() => setEditEmp(null)}>Hủy</Btn>
+                <Btn onClick={() => {
+                  if (!editEmp.name.trim() || !editEmp.email.trim()) return;
+                  setEmps(prev => prev.map(e => e.id === editEmp.id ? editEmp : e));
+                  setEditEmp(null);
+                }}>
+                  <Ico d={IC.check} size={14} /> Lưu thay đổi
+                </Btn>
+              </div>
+            </div>
           </div>
         </Modal>
       )}
