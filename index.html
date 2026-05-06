@@ -849,6 +849,20 @@ const EmployeePage = ({ onNav }) => {
   const [filterDept, setFilterDept] = useState("");
   const [filterRole, setFilterRole] = useState("");
   const [filterContract, setFilterContract] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [lastSynced, setLastSynced] = useState("13/04/2026 · 14:32");
+
+  const handleSync = () => {
+    if (syncing) return;
+    setSyncing(true);
+    setTimeout(() => {
+      setSyncing(false);
+      const now = new Date();
+      setLastSynced(
+        `${now.toLocaleDateString("vi-VN")} · ${now.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}`
+      );
+    }, 2400);
+  };
 
   const [emps, setEmps] = useState([
     { id: 1, name: "Nguyễn Văn An",  dept: "Engineering", role: "Senior Developer",    level: "Senior", status: "active",   joined: "01/2023", dob: "15/03/1990", gender: "Nam",  email: "an.nguyen@vareal.vn",    phone: "0901-234-567", contract: "Chính thức", manager: "Trần Thị Ngọc",    address: "Quận 1, TP.HCM" },
@@ -887,10 +901,108 @@ const EmployeePage = ({ onNav }) => {
               <Ico d={view === "list" ? IC.dash : IC.filter} size={14} />{view === "list" ? "Lưới" : "Danh sách"}
             </Btn>
             <Btn v="secondary"><Ico d={IC.download} size={14} /> Xuất</Btn>
-            <Btn><Ico d={IC.add} size={14} /> Thêm nhân viên</Btn>
+            <Btn
+              v="secondary"
+              onClick={handleSync}
+              disabled={syncing}
+              style={{ opacity: syncing ? 0.75 : 1, minWidth: 112 }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+                style={{ flexShrink: 0, animation: syncing ? "spin 0.75s linear infinite" : "none" }}>
+                <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+              {syncing ? "Đang sync..." : "Sync Data"}
+            </Btn>
+            <Btn onClick={() => window.open("/vv-id", "_blank")}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+              Go to VV_ID
+            </Btn>
           </>
         }
       />
+
+      {/* ── VV_ID Source Banner ── */}
+      <div style={{
+        display: "flex", gap: 14, alignItems: "flex-start",
+        padding: "14px 18px",
+        background: "linear-gradient(135deg,#EFF6FF 0%,#F0F9FF 100%)",
+        border: "1px solid #BFDBFE",
+        borderRadius: T.r, marginBottom: 10,
+      }}>
+        {/* Icon col */}
+        <div style={{ width: 38, height: 38, borderRadius: T.rSm, background: "#DBEAFE", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        </div>
+
+        {/* Text col */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#1E40AF", marginBottom: 4 }}>
+            Dữ liệu được đồng bộ từ VV_ID
+          </div>
+          <div style={{ fontSize: 12, color: "#3B82F6", lineHeight: 1.65 }}>
+            Dữ liệu nhân viên được quản lý tại hệ thống <b>VV_ID</b>. Để thêm mới hoặc chỉnh sửa thông tin nhân viên, vui lòng thực hiện tại VV_ID, sau đó quay lại đây và bấm <b>"Sync Data"</b> để cập nhật.
+          </div>
+          {/* 3-step flow */}
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 10 }}>
+            {[
+              { n: "1", icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>, text: "Vào VV_ID để tạo / sửa nhân viên" },
+              { n: "2", icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>, text: "Quay lại Nexus → bấm Sync Data" },
+              { n: "3", icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>, text: "Dữ liệu cập nhật tự động" },
+            ].map((step, i) => (
+              <React.Fragment key={i}>
+                {i > 0 && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#93C5FD" strokeWidth="2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>}
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", background: "#DBEAFE", borderRadius: T.rFull, fontSize: 11, fontWeight: 600, color: "#1D4ED8" }}>
+                  <span style={{ background: "#1D4ED8", color: "#fff", borderRadius: "50%", width: 14, height: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, flexShrink: 0 }}>{step.n}</span>
+                  {step.icon}
+                  {step.text}
+                </div>
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+
+        {/* Right col — last sync + actions */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
+          <div style={{ textAlign: "right", fontSize: 11, color: "#93C5FD", lineHeight: 1.5 }}>
+            Sync lần cuối<br/>
+            <span style={{ fontWeight: 700, color: "#2563EB", fontSize: 12 }}>{lastSynced}</span>
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              onClick={() => window.open("/vv-id", "_blank")}
+              style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: T.rSm, border: "1.5px solid #93C5FD", background: "#fff", color: "#2563EB", fontSize: 11, fontWeight: 600, cursor: "pointer", transition: "all 0.12s" }}
+            >
+              VV_ID
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </button>
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 14px", borderRadius: T.rSm, border: "none", background: syncing ? "#93C5FD" : "#2563EB", color: "#fff", fontSize: 11, fontWeight: 700, cursor: syncing ? "not-allowed" : "pointer", transition: "all 0.15s" }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                style={{ animation: syncing ? "spin 0.75s linear infinite" : "none" }}>
+                <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+              {syncing ? "Syncing…" : "Sync"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Sync progress bar ── */}
+      {syncing && (
+        <div style={{ height: 3, borderRadius: 2, background: "#DBEAFE", overflow: "hidden", marginBottom: 10 }}>
+          <div style={{ height: "100%", borderRadius: 2, background: "linear-gradient(90deg,#2563EB,#60A5FA,#2563EB)", backgroundSize: "200% 100%", animation: "syncSlide 1.2s linear infinite" }} />
+        </div>
+      )}
 
       {/* ── Search bar ── */}
       <Card style={{ padding: "12px 16px", marginBottom: 12 }}>
@@ -1206,70 +1318,103 @@ const EmployeePage = ({ onNav }) => {
       {/* ===== EDIT EMPLOYEE MODAL ===== */}
       {editEmp && (
         <Modal title="Chỉnh sửa hồ sơ nhân viên" onClose={() => setEditEmp(null)} width={660}>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", background: T.surfaceAlt, borderRadius: T.r, marginBottom: 20 }}>
+
+          {/* Employee header */}
+          <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", background: T.surfaceAlt, borderRadius: T.r, marginBottom: 14 }}>
             <Avatar name={editEmp.name} size={48} colors={[`${dc[editEmp.dept]}40`, dc[editEmp.dept]]} />
-            <div>
+            <div style={{ flex: 1 }}>
               <div style={{ fontSize: 16, fontWeight: 800, fontFamily: T.fontD, color: T.ink }}>{editEmp.name}</div>
               <div style={{ fontSize: 12, color: T.inkMuted }}>ID: EMP-00{editEmp.id} · Vào: {editEmp.joined}</div>
             </div>
+          </div>
+
+          {/* VV_ID read-only notice */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: T.rSm, marginBottom: 20 }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <div style={{ flex: 1, fontSize: 12, color: "#1E40AF", lineHeight: 1.5 }}>
+              Trường <b>Tên, Email, Điện thoại, Giới tính</b> được đồng bộ từ <b>VV_ID</b> — chỉ xem, không thể sửa tại đây.
+            </div>
+            <button
+              onClick={() => window.open("/vv-id", "_blank")}
+              style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: T.rSm, border: "1.5px solid #93C5FD", background: "#fff", color: "#2563EB", fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+            >
+              Sửa tại VV_ID
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </button>
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
             {/* ── Thông tin cá nhân ── */}
             <div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: T.inkSoft, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12, paddingBottom: 6, borderBottom: `2px solid ${T.borderLight}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700, color: T.inkSoft, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12, paddingBottom: 6, borderBottom: `2px solid ${T.borderLight}` }}>
                 Thông tin cá nhân
+                <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: T.rFull, background: "#DBEAFE", color: "#2563EB", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>🔒 VV_ID</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <Input
-                  label="Họ và tên *"
-                  value={editEmp.name}
-                  onChange={e => setEditEmp(p => ({ ...p, name: e.target.value }))}
-                />
+
+                {/* Name — READ ONLY */}
                 <div>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Giới tính</label>
-                  <select
-                    value={editEmp.gender || "Nam"}
-                    onChange={e => setEditEmp(p => ({ ...p, gender: e.target.value }))}
-                    style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box" }}
-                  >
-                    <option>Nam</option>
-                    <option>Nữ</option>
-                    <option>Khác</option>
-                  </select>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: T.inkMuted, marginBottom: 5 }}>
+                    Họ và tên
+                    <span style={{ fontSize: 10, color: "#60A5FA", fontWeight: 600 }}>· VV_ID</span>
+                  </label>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: T.rSm, border: `1px dashed ${T.border}`, background: "#F8FAFC", fontSize: 13, color: T.inkSoft, userSelect: "none" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    {editEmp.name}
+                  </div>
                 </div>
-                <Input
-                  label="Ngày sinh"
-                  placeholder="DD/MM/YYYY"
-                  value={editEmp.dob || ""}
-                  onChange={e => setEditEmp(p => ({ ...p, dob: e.target.value }))}
-                />
-                <Input
-                  label="Địa chỉ"
-                  value={editEmp.address || ""}
-                  onChange={e => setEditEmp(p => ({ ...p, address: e.target.value }))}
-                />
+
+                {/* Gender — READ ONLY */}
+                <div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: T.inkMuted, marginBottom: 5 }}>
+                    Giới tính
+                    <span style={{ fontSize: 10, color: "#60A5FA", fontWeight: 600 }}>· VV_ID</span>
+                  </label>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: T.rSm, border: `1px dashed ${T.border}`, background: "#F8FAFC", fontSize: 13, color: T.inkSoft, userSelect: "none" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    {editEmp.gender || "—"}
+                  </div>
+                </div>
+
+                <Input label="Ngày sinh" placeholder="DD/MM/YYYY" value={editEmp.dob || ""} onChange={e => setEditEmp(p => ({ ...p, dob: e.target.value }))} />
+                <Input label="Địa chỉ" value={editEmp.address || ""} onChange={e => setEditEmp(p => ({ ...p, address: e.target.value }))} />
               </div>
             </div>
 
             {/* ── Liên hệ ── */}
             <div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: T.inkSoft, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12, paddingBottom: 6, borderBottom: `2px solid ${T.borderLight}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700, color: T.inkSoft, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12, paddingBottom: 6, borderBottom: `2px solid ${T.borderLight}` }}>
                 Thông tin liên hệ
+                <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: T.rFull, background: "#DBEAFE", color: "#2563EB", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>🔒 VV_ID</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <Input
-                  label="Email công ty *"
-                  type="email"
-                  value={editEmp.email}
-                  onChange={e => setEditEmp(p => ({ ...p, email: e.target.value }))}
-                />
-                <Input
-                  label="Số điện thoại"
-                  value={editEmp.phone}
-                  onChange={e => setEditEmp(p => ({ ...p, phone: e.target.value }))}
-                />
+
+                {/* Email — READ ONLY */}
+                <div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: T.inkMuted, marginBottom: 5 }}>
+                    Email công ty
+                    <span style={{ fontSize: 10, color: "#60A5FA", fontWeight: 600 }}>· VV_ID</span>
+                  </label>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: T.rSm, border: `1px dashed ${T.border}`, background: "#F8FAFC", fontSize: 13, color: T.inkSoft, userSelect: "none" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    {editEmp.email}
+                  </div>
+                </div>
+
+                {/* Phone — READ ONLY */}
+                <div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600, color: T.inkMuted, marginBottom: 5 }}>
+                    Số điện thoại
+                    <span style={{ fontSize: 10, color: "#60A5FA", fontWeight: 600 }}>· VV_ID</span>
+                  </label>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 12px", borderRadius: T.rSm, border: `1px dashed ${T.border}`, background: "#F8FAFC", fontSize: 13, color: T.inkSoft, userSelect: "none" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    {editEmp.phone}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1279,52 +1424,23 @@ const EmployeePage = ({ onNav }) => {
                 Thông tin công việc
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <Input
-                  label="Vị trí / Chức danh *"
-                  value={editEmp.role}
-                  onChange={e => setEditEmp(p => ({ ...p, role: e.target.value }))}
-                />
+                <Input label="Vị trí / Chức danh *" value={editEmp.role} onChange={e => setEditEmp(p => ({ ...p, role: e.target.value }))} />
                 <div>
                   <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Phòng ban *</label>
-                  <select
-                    value={editEmp.dept}
-                    onChange={e => setEditEmp(p => ({ ...p, dept: e.target.value }))}
-                    style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box" }}
-                  >
-                    <option>Engineering</option>
-                    <option>Design</option>
-                    <option>QA</option>
-                    <option>HR</option>
-                    <option>Kế toán</option>
-                    <option>Ban lãnh đạo</option>
+                  <select value={editEmp.dept} onChange={e => setEditEmp(p => ({ ...p, dept: e.target.value }))} style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box" }}>
+                    <option>Engineering</option><option>Design</option><option>QA</option><option>HR</option><option>Kế toán</option><option>Ban lãnh đạo</option>
                   </select>
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Cấp bậc</label>
-                  <select
-                    value={editEmp.level || "Middle"}
-                    onChange={e => setEditEmp(p => ({ ...p, level: e.target.value }))}
-                    style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box" }}
-                  >
-                    <option>Junior</option>
-                    <option>Middle</option>
-                    <option>Senior</option>
-                    <option>Lead</option>
-                    <option>Manager</option>
-                    <option>Director</option>
+                  <select value={editEmp.level || "Middle"} onChange={e => setEditEmp(p => ({ ...p, level: e.target.value }))} style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box" }}>
+                    <option>Junior</option><option>Middle</option><option>Senior</option><option>Lead</option><option>Manager</option><option>Director</option>
                   </select>
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Quản lý trực tiếp</label>
-                  <select
-                    value={editEmp.manager}
-                    onChange={e => setEditEmp(p => ({ ...p, manager: e.target.value }))}
-                    style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box" }}
-                  >
-                    <option>Trần Thị Ngọc</option>
-                    <option>Đinh Trọng Hưng</option>
-                    <option>Lê Ngọc Minh Thư</option>
-                    <option>Nguyễn Thị Vân</option>
+                  <select value={editEmp.manager} onChange={e => setEditEmp(p => ({ ...p, manager: e.target.value }))} style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box" }}>
+                    <option>Trần Thị Ngọc</option><option>Đinh Trọng Hưng</option><option>Lê Ngọc Minh Thư</option><option>Nguyễn Thị Vân</option>
                   </select>
                 </div>
               </div>
@@ -1338,30 +1454,14 @@ const EmployeePage = ({ onNav }) => {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
                 <div>
                   <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Loại hợp đồng</label>
-                  <select
-                    value={editEmp.contract}
-                    onChange={e => setEditEmp(p => ({ ...p, contract: e.target.value }))}
-                    style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box" }}
-                  >
-                    <option>Thử việc</option>
-                    <option>Chính thức</option>
-                    <option>Hợp đồng thời vụ</option>
-                    <option>Freelance</option>
+                  <select value={editEmp.contract} onChange={e => setEditEmp(p => ({ ...p, contract: e.target.value }))} style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box" }}>
+                    <option>Thử việc</option><option>Chính thức</option><option>Hợp đồng thời vụ</option><option>Freelance</option>
                   </select>
                 </div>
-                <Input
-                  label="Ngày vào làm"
-                  placeholder="MM/YYYY"
-                  value={editEmp.joined}
-                  onChange={e => setEditEmp(p => ({ ...p, joined: e.target.value }))}
-                />
+                <Input label="Ngày vào làm" placeholder="MM/YYYY" value={editEmp.joined} onChange={e => setEditEmp(p => ({ ...p, joined: e.target.value }))} />
                 <div>
                   <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Trạng thái</label>
-                  <select
-                    value={editEmp.status}
-                    onChange={e => setEditEmp(p => ({ ...p, status: e.target.value }))}
-                    style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box" }}
-                  >
+                  <select value={editEmp.status} onChange={e => setEditEmp(p => ({ ...p, status: e.target.value }))} style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box" }}>
                     <option value="active">Đang làm</option>
                     <option value="on_leave">Đang nghỉ</option>
                     <option value="resigned">Đã nghỉ việc</option>
@@ -1371,25 +1471,14 @@ const EmployeePage = ({ onNav }) => {
             </div>
 
             {/* ── Actions ── */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 4, borderTop: `1px solid ${T.borderLight}` }}>
-              <Btn v="danger" onClick={() => {
-                if (window.confirm(`Xác nhận xóa nhân viên "${editEmp.name}"?`)) {
-                  setEmps(prev => prev.filter(e => e.id !== editEmp.id));
-                  setEditEmp(null);
-                }
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 4, borderTop: `1px solid ${T.borderLight}` }}>
+              <Btn v="secondary" onClick={() => setEditEmp(null)}>Hủy</Btn>
+              <Btn onClick={() => {
+                setEmps(prev => prev.map(e => e.id === editEmp.id ? editEmp : e));
+                setEditEmp(null);
               }}>
-                Xóa nhân viên
+                <Ico d={IC.check} size={14} /> Lưu thay đổi
               </Btn>
-              <div style={{ display: "flex", gap: 10 }}>
-                <Btn v="secondary" onClick={() => setEditEmp(null)}>Hủy</Btn>
-                <Btn onClick={() => {
-                  if (!editEmp.name.trim() || !editEmp.email.trim()) return;
-                  setEmps(prev => prev.map(e => e.id === editEmp.id ? editEmp : e));
-                  setEditEmp(null);
-                }}>
-                  <Ico d={IC.check} size={14} /> Lưu thay đổi
-                </Btn>
-              </div>
             </div>
           </div>
         </Modal>
@@ -4053,6 +4142,7 @@ const App = function App() {
         tr:hover td { background: ${T.surfaceHover}; }
         button:hover { filter: brightness(0.95); }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes syncSlide { from { background-position: 200% 0; } to { background-position: -200% 0; } }
       `}</style>
       <div style={{ display: "flex", minHeight: "100vh", fontFamily: T.fontB }}>
         <Sidebar active={page} onNav={setPage} />
