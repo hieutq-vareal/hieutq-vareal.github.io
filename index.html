@@ -550,6 +550,31 @@ const DashboardPage = ({ onNav }) => {
 const LeavePage = ({ onNav }) => {
   const [tab, setTab] = useState("requests");
   const [modal, setModal] = useState(null); // null | "new" | request obj
+  const [editLeavePolicy, setEditLeavePolicy] = useState(null);
+
+  // Datetime form state
+  const [leaveForm, setLeaveForm] = useState({
+    type: "", fromDt: "", toDt: "", reason: "",
+  });
+
+  // Available approval workflows (mirrors Settings data)
+  const approvalWorkflows = [
+    { id: 1, label: "Nghỉ phép (≤ 3 ngày)",  steps: "Người nộp → Manager" },
+    { id: 2, label: "Nghỉ phép (> 3 ngày)",  steps: "Người nộp → Manager → Director" },
+    { id: 3, label: "Nghỉ ốm (có giấy)",      steps: "Người nộp → Manager → HR" },
+    { id: 4, label: "WFH",                     steps: "Người nộp → Manager (tự duyệt sau 24h)" },
+    { id: 8, label: "Xác nhận giấy tờ",        steps: "Người nộp → HR" },
+  ];
+
+  // Leave policy data enriched with workflow link
+  const [leavePolicies, setLeavePolicies] = useState([
+    { id: 1, type: "Nghỉ phép năm",   days: 12,  unit: "ngày/năm", paid: true,  color: T.primary,   workflowId: 2, desc: "Cộng dồn tối đa 5 ngày · Cho phép nửa ngày · +1 ngày/5 năm thâm niên" },
+    { id: 2, type: "Nghỉ ốm",         days: 30,  unit: "ngày/năm", paid: true,  color: T.danger,    workflowId: 3, desc: "Hưởng BHXH · Yêu cầu giấy xác nhận y tế" },
+    { id: 3, type: "Nghỉ không lương",days: null, unit: "∞",        paid: false, color: T.inkMuted,  workflowId: 1, desc: "Theo thỏa thuận" },
+    { id: 4, type: "Nghỉ cưới",       days: 3,   unit: "ngày/lần", paid: true,  color: "#EC4899",   workflowId: 1, desc: "Bản thân kết hôn · Cần giấy đăng ký kết hôn" },
+    { id: 5, type: "Nghỉ tang",       days: 3,   unit: "ngày/lần", paid: true,  color: T.ink,       workflowId: 1, desc: "Cha/mẹ/vợ-chồng/con: 3 ngày · Ông/bà: 1 ngày" },
+    { id: 6, type: "Thai sản",        days: 180, unit: "ngày",     paid: true,  color: "#7C3AED",   workflowId: 2, desc: "Nữ: 6 tháng · Nam: 5–14 ngày · Theo luật BHXH" },
+  ]);
 
   const balances = [
     { type: "Phép năm", total: 12, used: 4, pending: 2, color: T.primary },
@@ -688,25 +713,105 @@ const LeavePage = ({ onNav }) => {
       )}
 
       {tab === "policy" && (
-        <Card>
-          <h3 style={{ fontFamily: T.fontD, fontSize: 16, fontWeight: 700, margin: "0 0 4px" }}>Chính sách nghỉ phép</h3>
-          <p style={{ fontSize: 12, color: T.inkMuted, margin: "0 0 20px" }}>Cấu hình loại phép, quy tắc tính, cộng dồn — theo Bộ luật Lao động 2019</p>
-          {balances.map((b, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 0", borderTop: i ? `1px solid ${T.borderLight}` : "none" }}>
-              <div style={{ width: 4, height: 32, borderRadius: 2, background: b.color }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: T.ink }}>{b.type}</div>
-                <div style={{ fontSize: 11, color: T.inkMuted }}>
-                  {b.total === "∞" ? "Không giới hạn" : `${b.total} ngày/năm`}
-                  {b.type === "Phép năm" && " · Cộng dồn tối đa 5 ngày · Cho phép nửa ngày · +1 ngày/5 năm thâm niên"}
-                  {b.type === "Nghỉ ốm" && " · Có BHXH · Yêu cầu giấy xác nhận y tế"}
-                  {b.type === "Thai sản" && " · Theo luật BHXH · Nữ: 6 tháng, Nam: 5-7 ngày"}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <Card style={{ padding: 0, overflow: "hidden" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: `1px solid ${T.borderLight}` }}>
+              <div>
+                <h3 style={{ fontFamily: T.fontD, fontSize: 15, fontWeight: 700, margin: "0 0 2px" }}>Chính sách nghỉ phép</h3>
+                <div style={{ fontSize: 12, color: T.inkMuted }}>Cấu hình loại phép, quy tắc tính và luồng phê duyệt liên kết</div>
+              </div>
+              <Btn v="secondary" size="sm"><Ico d={IC.add} size={14} /> Thêm loại phép</Btn>
+            </div>
+
+            {leavePolicies.map((lp, i) => {
+              const wf = approvalWorkflows.find(w => w.id === lp.workflowId);
+              return (
+                <div key={i} style={{ padding: "16px 20px", borderBottom: i < leavePolicies.length - 1 ? `1px solid ${T.borderLight}` : "none", display: "flex", gap: 14, alignItems: "flex-start" }}>
+                  <div style={{ width: 4, minHeight: 44, borderRadius: 2, background: lp.color, flexShrink: 0, marginTop: 3 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: T.ink }}>{lp.type}</span>
+                      {lp.paid ? <Badge color={T.success} bg={T.successSoft}>Có lương</Badge> : <Badge color={T.inkMuted} bg={T.surfaceAlt}>Không lương</Badge>}
+                      <Badge color={T.inkSoft} bg={T.surfaceAlt}>{lp.days !== null ? `${lp.days} ${lp.unit}` : lp.unit}</Badge>
+                    </div>
+                    <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 8 }}>{lp.desc}</div>
+                    {/* Workflow badge */}
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: T.rFull, background: wf ? T.infoSoft : T.surfaceAlt, border: `1px solid ${wf ? T.info + "40" : T.border}` }}>
+                      <span style={{ fontSize: 12 }}>✅</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: wf ? T.info : T.inkMuted }}>
+                        {wf ? `Workflow: ${wf.label}` : "Chưa liên kết workflow"}
+                      </span>
+                      {wf && <span style={{ fontSize: 10, color: T.inkMuted }}>· {wf.steps}</span>}
+                    </div>
+                  </div>
+                  <Btn v="ghost" size="sm" onClick={() => setEditLeavePolicy({ ...lp })}><Ico d={IC.edit} size={14} /></Btn>
+                </div>
+              );
+            })}
+          </Card>
+
+          {/* Edit policy modal with workflow selector */}
+          {editLeavePolicy && (
+            <Modal title={`Chỉnh sửa chính sách — ${editLeavePolicy.type}`} onClose={() => setEditLeavePolicy(null)} width={540}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <Input label="Tên loại phép *" value={editLeavePolicy.type} onChange={e => setEditLeavePolicy(p => ({ ...p, type: e.target.value }))} />
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <Input label="Số ngày" type="number" value={editLeavePolicy.days ?? ""} placeholder="Để trống = không giới hạn" onChange={e => setEditLeavePolicy(p => ({ ...p, days: e.target.value ? Number(e.target.value) : null }))} />
+                  <Input label="Đơn vị" value={editLeavePolicy.unit} onChange={e => setEditLeavePolicy(p => ({ ...p, unit: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Có lương</label>
+                  <select value={editLeavePolicy.paid ? "yes" : "no"} onChange={e => setEditLeavePolicy(p => ({ ...p, paid: e.target.value === "yes" }))} style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB }}>
+                    <option value="yes">Có lương</option><option value="no">Không lương</option>
+                  </select>
+                </div>
+
+                {/* Workflow mapping — key new field */}
+                <div style={{ borderTop: `1px dashed ${T.border}`, paddingTop: 14 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: T.inkSoft, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    <span style={{ fontSize: 14 }}>✅</span>
+                    Luồng phê duyệt liên kết
+                  </label>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {approvalWorkflows.map(wf => (
+                      <div
+                        key={wf.id}
+                        onClick={() => setEditLeavePolicy(p => ({ ...p, workflowId: wf.id }))}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
+                          borderRadius: T.rSm, cursor: "pointer",
+                          border: `1.5px solid ${editLeavePolicy.workflowId === wf.id ? T.primary : T.border}`,
+                          background: editLeavePolicy.workflowId === wf.id ? T.primarySoft : T.surface,
+                          transition: "all 0.13s",
+                        }}
+                      >
+                        <div style={{ width: 16, height: 16, borderRadius: "50%", flexShrink: 0, border: `2px solid ${editLeavePolicy.workflowId === wf.id ? T.primary : T.border}`, background: editLeavePolicy.workflowId === wf.id ? T.primary : "transparent", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                          {editLeavePolicy.workflowId === wf.id && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "white" }} />}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: editLeavePolicy.workflowId === wf.id ? T.primary : T.ink }}>{wf.label}</div>
+                          <div style={{ fontSize: 11, color: T.inkMuted }}>{wf.steps}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 11, color: T.inkMuted, marginTop: 8 }}>
+                    💡 Để cấu hình chi tiết luồng phê duyệt, vào <b>Cài đặt → Approval Workflow</b>
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Ghi chú / Cơ sở pháp lý</label>
+                  <textarea rows={2} value={editLeavePolicy.desc} onChange={e => setEditLeavePolicy(p => ({ ...p, desc: e.target.value }))} style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, resize: "vertical", boxSizing: "border-box" }} />
+                </div>
+                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 4, borderTop: `1px solid ${T.borderLight}` }}>
+                  <Btn v="secondary" onClick={() => setEditLeavePolicy(null)}>Hủy</Btn>
+                  <Btn onClick={() => { setLeavePolicies(prev => prev.map(p => p.id === editLeavePolicy.id ? editLeavePolicy : p)); setEditLeavePolicy(null); }}><Ico d={IC.check} size={14} /> Lưu chính sách</Btn>
                 </div>
               </div>
-              <Btn v="ghost" size="sm"><Ico d={IC.edit} size={14} /> Sửa</Btn>
-            </div>
-          ))}
-        </Card>
+            </Modal>
+          )}
+        </div>
       )}
 
       {tab === "holidays" && (
@@ -735,49 +840,164 @@ const LeavePage = ({ onNav }) => {
       )}
 
       {/* NEW LEAVE MODAL */}
-      {modal === "new" && (
-        <Modal title="Tạo đơn nghỉ phép" onClose={() => setModal(null)} width={540}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <Select label="Loại nghỉ phép *">
-              <option>— Chọn loại —</option>
-              <option>Nghỉ phép năm</option><option>Nghỉ ốm</option>
-              <option>Nghỉ không lương</option><option>Nghỉ cưới</option>
-              <option>Nghỉ tang</option><option>Nghỉ thai sản</option>
-            </Select>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <Input label="Từ ngày *" type="date" />
-              <Input label="Đến ngày *" type="date" />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <Select label="Hình thức"><option>Cả ngày</option><option>Nửa ngày — Sáng</option><option>Nửa ngày — Chiều</option><option>Theo giờ</option></Select>
-              <Input label="Tổng" value="2 ngày" readOnly style={{ background: T.surfaceAlt, fontWeight: 700, color: T.primary }} />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Lý do *</label>
-              <textarea rows={3} placeholder="Nhập lý do..." style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, resize: "vertical", boxSizing: "border-box" }} />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Người phê duyệt</label>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: T.rSm, background: T.surfaceAlt, border: `1px solid ${T.border}` }}>
-                <Avatar name="Trần Thị Ngọc" size={24} colors={[T.primary, T.primaryDark]} />
-                <span style={{ fontSize: 13, fontWeight: 500 }}>Trần Thị Ngọc — Director</span>
+      {modal === "new" && (() => {
+        // Calculate duration from leaveForm.fromDt and leaveForm.toDt
+        const calcDuration = () => {
+          if (!leaveForm.fromDt || !leaveForm.toDt) return null;
+          const from = new Date(leaveForm.fromDt);
+          const to   = new Date(leaveForm.toDt);
+          if (isNaN(from) || isNaN(to) || to <= from) return null;
+          const diffMs  = to - from;
+          const diffHrs = diffMs / 3600000;
+          const WORK_HRS = 8;
+          if (diffHrs < WORK_HRS) {
+            const h = Math.floor(diffHrs);
+            const m = Math.round((diffHrs - h) * 60);
+            return m > 0 ? `${h} giờ ${m} phút` : `${h} giờ`;
+          }
+          const days = Math.floor(diffHrs / WORK_HRS);
+          const remH = Math.round(diffHrs % WORK_HRS * 10) / 10;
+          if (remH === 0) return `${days} ngày`;
+          if (remH < 1)  return `${days} ngày ${Math.round(remH * 60)} phút`;
+          return `${days} ngày ${remH} giờ`;
+        };
+        const duration = calcDuration();
+        const hasRange = leaveForm.fromDt && leaveForm.toDt && new Date(leaveForm.toDt) > new Date(leaveForm.fromDt);
+
+        return (
+          <Modal title="Tạo đơn nghỉ phép" onClose={() => { setModal(null); setLeaveForm({ type: "", fromDt: "", toDt: "", reason: "" }); }} width={560}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+              {/* Loại nghỉ phép */}
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Loại nghỉ phép *</label>
+                <select
+                  value={leaveForm.type}
+                  onChange={e => setLeaveForm(p => ({ ...p, type: e.target.value }))}
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1.5px solid ${leaveForm.type ? T.primary : T.border}`, fontSize: 13, fontFamily: T.fontB, color: leaveForm.type ? T.ink : T.inkMuted, background: T.surface, boxSizing: "border-box" }}
+                >
+                  <option value="">— Chọn loại phép —</option>
+                  {leavePolicies.map(lp => <option key={lp.id} value={lp.type}>{lp.type}</option>)}
+                </select>
+              </div>
+
+              {/* Datetime pickers */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>
+                    Từ ngày & giờ *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={leaveForm.fromDt}
+                    onChange={e => setLeaveForm(p => ({ ...p, fromDt: e.target.value }))}
+                    style={{
+                      width: "100%", padding: "9px 12px", borderRadius: T.rSm,
+                      border: `1.5px solid ${leaveForm.fromDt ? T.primary : T.border}`,
+                      fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface,
+                      boxSizing: "border-box", outline: "none",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>
+                    Đến ngày & giờ *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={leaveForm.toDt}
+                    min={leaveForm.fromDt || undefined}
+                    onChange={e => setLeaveForm(p => ({ ...p, toDt: e.target.value }))}
+                    style={{
+                      width: "100%", padding: "9px 12px", borderRadius: T.rSm,
+                      border: `1.5px solid ${leaveForm.toDt ? T.primary : T.border}`,
+                      fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface,
+                      boxSizing: "border-box", outline: "none",
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Duration display */}
+              <div style={{
+                display: "flex", alignItems: "center", gap: 12,
+                padding: "12px 16px", borderRadius: T.r,
+                background: hasRange ? T.primarySoft : T.surfaceAlt,
+                border: `1.5px solid ${hasRange ? T.primary + "40" : T.border}`,
+                transition: "all 0.2s",
+              }}>
+                <div style={{ fontSize: 20 }}>⏱</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>
+                    Tổng thời gian nghỉ
+                  </div>
+                  <div style={{ fontSize: hasRange ? 20 : 14, fontWeight: 800, fontFamily: T.fontD, color: hasRange ? T.primary : T.inkMuted, lineHeight: 1.2 }}>
+                    {hasRange ? duration : "— Chọn thời gian để tính —"}
+                  </div>
+                </div>
+                {hasRange && (
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: 11, color: T.inkMuted }}>Từ</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: T.ink }}>{new Date(leaveForm.fromDt).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
+                    <div style={{ fontSize: 11, color: T.inkMuted, marginTop: 2 }}>Đến</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: T.ink }}>{new Date(leaveForm.toDt).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Lý do */}
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Lý do *</label>
+                <textarea
+                  rows={3}
+                  placeholder="Nhập lý do nghỉ phép..."
+                  value={leaveForm.reason}
+                  onChange={e => setLeaveForm(p => ({ ...p, reason: e.target.value }))}
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, resize: "vertical", boxSizing: "border-box" }}
+                />
+              </div>
+
+              {/* Người phê duyệt (auto từ workflow) */}
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Luồng phê duyệt</label>
+                <div style={{ padding: "10px 14px", borderRadius: T.rSm, background: T.surfaceAlt, border: `1px solid ${T.border}` }}>
+                  {leaveForm.type ? (() => {
+                    const policy = leavePolicies.find(p => p.type === leaveForm.type);
+                    const wf = policy ? approvalWorkflows.find(w => w.id === policy.workflowId) : null;
+                    return wf ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 14 }}>✅</span>
+                        <div>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: T.ink }}>{wf.label}</div>
+                          <div style={{ fontSize: 11, color: T.inkMuted }}>{wf.steps}</div>
+                        </div>
+                      </div>
+                    ) : <span style={{ fontSize: 12, color: T.inkMuted }}>Chưa cấu hình workflow</span>;
+                  })() : <span style={{ fontSize: 12, color: T.inkMuted }}>Chọn loại phép để xem luồng phê duyệt</span>}
+                </div>
+              </div>
+
+              {/* File đính kèm */}
+              <div style={{ border: `2px dashed ${T.border}`, borderRadius: T.r, padding: 16, textAlign: "center", color: T.inkMuted, fontSize: 12, cursor: "pointer" }}>
+                Kéo thả hoặc <span style={{ color: T.primary, fontWeight: 600 }}>chọn tệp đính kèm</span>
+                <div style={{ fontSize: 10, marginTop: 3 }}>PDF, JPG, PNG — Tối đa 5MB</div>
+              </div>
+
+              {/* Info note */}
+              <div style={{ background: T.infoSoft, borderRadius: T.rSm, padding: "10px 14px", fontSize: 12, color: T.info, display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <span style={{ fontWeight: 700 }}>ℹ</span>
+                <span>Phép năm còn lại: <b>6 ngày</b>. Sau khi duyệt, lịch nghỉ sẽ tự động đồng bộ Google Calendar.</span>
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+                <Btn v="secondary" onClick={() => { setModal(null); setLeaveForm({ type: "", fromDt: "", toDt: "", reason: "" }); }}>Hủy</Btn>
+                <Btn disabled={!leaveForm.type || !leaveForm.fromDt || !leaveForm.toDt || !hasRange}>Gửi đơn nghỉ phép</Btn>
               </div>
             </div>
-            <div style={{ border: `2px dashed ${T.border}`, borderRadius: T.r, padding: 16, textAlign: "center", color: T.inkMuted, fontSize: 12, cursor: "pointer" }}>
-              Kéo thả hoặc <span style={{ color: T.primary, fontWeight: 600 }}>chọn tệp đính kèm</span>
-              <div style={{ fontSize: 10, marginTop: 3 }}>PDF, JPG, PNG — Tối đa 5MB</div>
-            </div>
-            <div style={{ background: T.infoSoft, borderRadius: T.rSm, padding: "10px 14px", fontSize: 12, color: T.info, display: "flex", gap: 8, alignItems: "flex-start" }}>
-              <span style={{ fontWeight: 700 }}>ℹ</span>
-              <span>Phép năm còn lại: <b>6 ngày</b>. Sau khi duyệt, lịch nghỉ sẽ tự động đồng bộ Google Calendar.</span>
-            </div>
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
-              <Btn v="secondary" onClick={() => setModal(null)}>Hủy</Btn>
-              <Btn>Gửi đơn nghỉ phép</Btn>
-            </div>
-          </div>
-        </Modal>
-      )}
+          </Modal>
+        );
+      })()}
 
       {/* DETAIL MODAL */}
       {modal && typeof modal === "object" && (
