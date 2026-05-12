@@ -3557,6 +3557,27 @@ const SettingsPage = () => {
   const [showNewRoleModal, setShowNewRoleModal] = useState(false);
   const [newRole, setNewRole] = useState({ name: "", desc: "", color: "#4B7BF7", level: "middle" });
   const [editingMatrix, setEditingMatrix] = useState(false);
+  const [wfSearch, setWfSearch] = useState("");
+
+  // Working schedule per day: "full" | "half-am" | "half-pm" | "off"
+  const [weekSchedule, setWeekSchedule] = useState({
+    T2: "full", T3: "full", T4: "full", T5: "full", T6: "full", T7: "off", CN: "off",
+  });
+  const setDay = (day, type) => setWeekSchedule(p => ({ ...p, [day]: type }));
+
+  // Working Time config per day: { start, end, breakStart, breakEnd }
+  // Only relevant for full / half-am / half-pm days
+  const [dayWorkTime, setDayWorkTime] = useState({
+    T2: { start: "08:00", end: "17:00", breakStart: "12:00", breakEnd: "13:00" },
+    T3: { start: "08:00", end: "17:00", breakStart: "12:00", breakEnd: "13:00" },
+    T4: { start: "08:00", end: "17:00", breakStart: "12:00", breakEnd: "13:00" },
+    T5: { start: "08:00", end: "17:00", breakStart: "12:00", breakEnd: "13:00" },
+    T6: { start: "08:00", end: "17:00", breakStart: "12:00", breakEnd: "13:00" },
+    T7: { start: "08:00", end: "12:00", breakStart: null,    breakEnd: null    },
+    CN: { start: "08:00", end: "12:00", breakStart: null,    breakEnd: null    },
+  });
+  const updateDayTime = (day, field, val) =>
+    setDayWorkTime(p => ({ ...p, [day]: { ...p[day], [field]: val } }));
 
   // ── personal states ──────────────────────────────────────────
   const [notifSettings, setNotifSettings] = useState({
@@ -3594,13 +3615,13 @@ const SettingsPage = () => {
 
   // ── data ─────────────────────────────────────────────────────
   const leaveTypes = [
-    { id: 1, name: "Nghỉ phép năm", days: 12, unit: "ngày/năm", paid: true, carry: true, maxCarry: 5, halfDay: true, probation: false, seniorityBonus: "+1 ngày / 5 năm", docs: false, color: T.primary, desc: "Theo Điều 113 Bộ luật Lao động 2019" },
-    { id: 2, name: "Nghỉ ốm", days: 30, unit: "ngày/năm", paid: true, carry: false, maxCarry: 0, halfDay: true, probation: true, docs: true, docsDesc: "Giấy xác nhận y tế", color: T.danger, desc: "Hưởng BHXH, tối đa 30 ngày/năm (đóng < 15 năm)" },
-    { id: 3, name: "Nghỉ không lương", days: null, unit: "không giới hạn", paid: false, carry: false, maxCarry: 0, halfDay: false, probation: false, docs: false, color: T.inkMuted, desc: "Theo thỏa thuận giữa NLĐ và NSDLĐ" },
-    { id: 4, name: "Nghỉ cưới", days: 3, unit: "ngày/lần", paid: true, carry: false, maxCarry: 0, halfDay: false, probation: true, docs: true, docsDesc: "Giấy đăng ký kết hôn", color: "#EC4899", desc: "Điều 115 BLLĐ — bản thân kết hôn" },
-    { id: 5, name: "Nghỉ tang", days: 3, unit: "ngày/lần", paid: true, carry: false, maxCarry: 0, halfDay: false, probation: true, docs: true, docsDesc: "Giấy báo tử", color: T.ink, desc: "Cha/mẹ/vợ-chồng/con mất: 3 ngày, ông/bà: 1 ngày" },
-    { id: 6, name: "Nghỉ thai sản", days: 180, unit: "ngày", paid: true, carry: false, maxCarry: 0, halfDay: false, probation: false, docs: true, docsDesc: "Giấy xác nhận thai sản", color: "#7C3AED", desc: "Nữ: 6 tháng, Nam: 5-14 ngày — theo luật BHXH" },
-    { id: 7, name: "Nghỉ hiếu sự con", days: 1, unit: "ngày/lần", paid: true, carry: false, maxCarry: 0, halfDay: false, probation: true, docs: false, color: T.accent, desc: "Con kết hôn: 1 ngày (Điều 115 BLLĐ)" },
+    { id: 1, name: "Nghỉ phép năm",   days: 12,  unit: "ngày/năm",     paid: true,  carry: true,  maxCarry: 5, halfDay: true,  probation: false, seniorityBonus: "+1 ngày / 5 năm", docs: false, color: T.primary,  workflowId: 2, desc: "Theo Điều 113 Bộ luật Lao động 2019" },
+    { id: 2, name: "Nghỉ ốm",         days: 30,  unit: "ngày/năm",     paid: true,  carry: false, maxCarry: 0, halfDay: true,  probation: true,  docs: true,  docsDesc: "Giấy xác nhận y tế",      color: T.danger,   workflowId: 3, desc: "Hưởng BHXH, tối đa 30 ngày/năm (đóng < 15 năm)" },
+    { id: 3, name: "Nghỉ không lương",days: null, unit: "không giới hạn",paid: false, carry: false, maxCarry: 0, halfDay: false, probation: false, docs: false, color: T.inkMuted,  workflowId: 1, desc: "Theo thỏa thuận giữa NLĐ và NSDLĐ" },
+    { id: 4, name: "Nghỉ cưới",       days: 3,   unit: "ngày/lần",     paid: true,  carry: false, maxCarry: 0, halfDay: false, probation: true,  docs: true,  docsDesc: "Giấy đăng ký kết hôn",    color: "#EC4899",  workflowId: 1, desc: "Điều 115 BLLĐ — bản thân kết hôn" },
+    { id: 5, name: "Nghỉ tang",       days: 3,   unit: "ngày/lần",     paid: true,  carry: false, maxCarry: 0, halfDay: false, probation: true,  docs: true,  docsDesc: "Giấy báo tử",             color: T.ink,      workflowId: 1, desc: "Cha/mẹ/vợ-chồng/con mất: 3 ngày, ông/bà: 1 ngày" },
+    { id: 6, name: "Nghỉ thai sản",   days: 180, unit: "ngày",         paid: true,  carry: false, maxCarry: 0, halfDay: false, probation: false, docs: true,  docsDesc: "Giấy xác nhận thai sản",  color: "#7C3AED",  workflowId: 2, desc: "Nữ: 6 tháng, Nam: 5-14 ngày — theo luật BHXH" },
+    { id: 7, name: "Nghỉ hiếu sự con",days: 1,   unit: "ngày/lần",     paid: true,  carry: false, maxCarry: 0, halfDay: false, probation: true,  docs: false, color: T.accent,   workflowId: 1, desc: "Con kết hôn: 1 ngày (Điều 115 BLLĐ)" },
   ];
 
   const approvalFlows = [
@@ -4085,71 +4106,217 @@ const SettingsPage = () => {
           </>)}
 
           {/* ──────────────── WORKING TIME ──────────────── */}
-          {effectiveTab === "workingtime" && (<>
-            <Card>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <div>
-                  <h3 style={{ fontFamily: T.fontD, fontSize: 16, fontWeight: 700, margin: "0 0 4px" }}>Working Time</h3>
-                  <p style={{ fontSize: 12, color: T.inkMuted, margin: 0 }}>Lịch làm việc của bạn — chỉ xem, liên hệ HR để thay đổi</p>
+          {effectiveTab === "workingtime" && (() => {
+            const DAY_META = [
+              { key: "T2", full: "Thứ Hai"  }, { key: "T3", full: "Thứ Ba"   },
+              { key: "T4", full: "Thứ Tư"   }, { key: "T5", full: "Thứ Năm"  },
+              { key: "T6", full: "Thứ Sáu"  }, { key: "T7", full: "Thứ Bảy"  },
+              { key: "CN", full: "Chủ Nhật" },
+            ];
+
+            const vals      = Object.values(weekSchedule);
+            const nFull     = vals.filter(v => v === "full").length;
+            const nHalf     = vals.filter(v => v.startsWith("half")).length;
+            const totalHrs  = nFull * 8 + nHalf * 4;
+            const totalDays = nFull + nHalf * 0.5;
+
+            const STATUS_CFG = {
+              "full":    { color: T.primary,  bg: T.primarySoft, border: T.primary  + "40", icon: "☀️",  label: "Full Day"    },
+              "half-am": { color: T.accent,   bg: T.accentSoft,  border: T.accent   + "50", icon: "🌅",  label: "Half Day AM" },
+              "half-pm": { color: "#7C3AED",  bg: "#F5F3FF",     border: "#7C3AED50",        icon: "🌆",  label: "Half Day PM" },
+              "off":     { color: T.inkMuted, bg: T.surfaceAlt,  border: T.border,           icon: "—",   label: "Off Day"     },
+            };
+
+            // Display-only time chip — no interaction
+            const TimeChip = ({ value, label }) => (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                {label && <span style={{ fontSize: 9, color: T.inkMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</span>}
+                <div style={{ padding: "5px 12px", borderRadius: T.rSm, background: T.surfaceAlt, border: `1px solid ${T.border}`, fontSize: 14, fontWeight: 700, color: T.ink, fontVariantNumeric: "tabular-nums", userSelect: "none" }}>
+                  {value}
                 </div>
-                <Badge color={T.inkMuted} bg={T.surfaceAlt}>Read-only</Badge>
               </div>
+            );
 
-              <div style={{ marginTop: 16, padding: "14px 16px", background: `${T.primary}06`, border: `1px solid ${T.primary}20`, borderRadius: T.r, display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
-                {[
-                  { icon: "⏰", label: "Giờ vào", value: "08:00" },
-                  { icon: "🏁", label: "Giờ tan", value: "17:00" },
-                  { icon: "🍽", label: "Nghỉ trưa", value: "12:00 – 13:00" },
-                  { icon: "📅", label: "Số ngày/tuần", value: "5 ngày" },
-                  { icon: "⏱", label: "Giờ/tuần", value: "40 giờ" },
-                ].map((item, i) => (
-                  <div key={i} style={{ textAlign: "center" }}>
-                    <div style={{ fontSize: 20, marginBottom: 4 }}>{item.icon}</div>
-                    <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 2 }}>{item.label}</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: T.ink }}>{item.value}</div>
+            return (
+              <>
+                {/* Read-only notice */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: T.warningSoft, border: `1px solid ${T.warning}30`, borderRadius: T.rSm }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.warning} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  </svg>
+                  <span style={{ fontSize: 12, color: T.warning, flex: 1 }}>
+                    Tab này chỉ dùng để <b>xem thông tin</b>. Để thay đổi cấu hình, vào tab <b>Working Schedule</b>.
+                  </span>
+                  <Badge color={T.warning} bg={T.warningSoft}>Read-only</Badge>
+                  <button
+                    onClick={() => setTab("schedule")}
+                    style={{ flexShrink: 0, padding: "4px 12px", borderRadius: T.rSm, border: `1.5px solid ${T.warning}50`, background: "white", color: T.warning, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+                  >
+                    Đến Working Schedule →
+                  </button>
+                </div>
+
+                {/* Weekly summary strip */}
+                <Card style={{ padding: 0, overflow: "hidden" }}>
+                  <div style={{ display: "flex" }}>
+                    {[
+                      { icon: "📅", label: "Ngày/tuần",  value: String(totalDays),        unit: "ngày", color: T.primary  },
+                      { icon: "⏱",  label: "Giờ/tuần",   value: String(totalHrs),         unit: "giờ",  color: T.success  },
+                      { icon: "☀️", label: "Full Day",    value: String(nFull),            unit: "ngày", color: T.primary  },
+                      { icon: "⏰", label: "Half Day",    value: String(nHalf),            unit: "ngày", color: T.accent   },
+                      { icon: "—",  label: "Off Day",     value: String(7 - nFull - nHalf), unit: "ngày", color: T.inkMuted },
+                    ].map((s, i) => (
+                      <div key={i} style={{ flex: 1, padding: "14px 10px", textAlign: "center", borderLeft: i > 0 ? `1px solid ${T.border}` : "none" }}>
+                        <div style={{ fontSize: 18, marginBottom: 3 }}>{s.icon}</div>
+                        <div style={{ fontSize: 22, fontWeight: 800, fontFamily: T.fontD, color: s.color, lineHeight: 1 }}>{s.value}</div>
+                        <div style={{ fontSize: 10, color: T.inkMuted, marginTop: 2 }}>{s.unit}</div>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: s.color, opacity: 0.75, marginTop: 1 }}>{s.label}</div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </Card>
 
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 10 }}>Ngày làm việc trong tuần</div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map((d, i) => (
-                    <div key={d} style={{
-                      width: 44, height: 44, borderRadius: T.r, display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 13, fontWeight: 600,
-                      background: i < 5 ? T.primarySoft : T.surfaceAlt,
-                      color: i < 5 ? T.primary : T.inkMuted,
-                      border: `2px solid ${i < 5 ? T.primary + "40" : T.border}`,
-                    }}>{d}</div>
+                {/* Per-day display table */}
+                <Card style={{ padding: 0, overflow: "hidden" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "110px 140px 1fr", background: T.surfaceAlt, borderBottom: `1px solid ${T.border}` }}>
+                    {["Ngày", "Trạng thái", "Giờ làm việc"].map((h, i) => (
+                      <div key={i} style={{ padding: "9px 16px", fontSize: 11, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</div>
+                    ))}
+                  </div>
+
+                  {DAY_META.map(({ key, full }, idx) => {
+                    const type     = weekSchedule[key];
+                    const cfg      = STATUS_CFG[type];
+                    const wt       = dayWorkTime[key];
+                    const isOff    = type === "off";
+                    const isFull   = type === "full";
+                    const isHalfAM = type === "half-am";
+                    const isHalfPM = type === "half-pm";
+
+                    return (
+                      <div
+                        key={key}
+                        style={{
+                          display: "grid", gridTemplateColumns: "110px 140px 1fr",
+                          borderBottom: idx < 6 ? `1px solid ${T.borderLight}` : "none",
+                          background: isOff ? T.surfaceAlt : "white",
+                          opacity: isOff ? 0.45 : 1,
+                          transition: "opacity 0.15s",
+                        }}
+                      >
+                        {/* Day name */}
+                        <div style={{ padding: "16px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: isOff ? T.inkMuted : T.ink }}>{key}</div>
+                          <div style={{ fontSize: 11, color: T.inkMuted }}>{full}</div>
+                        </div>
+
+                        {/* Status badge */}
+                        <div style={{ padding: "16px 12px", display: "flex", alignItems: "center" }}>
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 11px", borderRadius: T.rFull, background: cfg.bg, border: `1.5px solid ${cfg.border}`, userSelect: "none" }}>
+                            <span style={{ fontSize: 13 }}>{cfg.icon}</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: cfg.color }}>{cfg.label}</span>
+                          </div>
+                        </div>
+
+                        {/* Time display — read-only */}
+                        <div style={{ padding: "12px 16px", display: "flex", alignItems: "center" }}>
+                          {isOff ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
+                              <div style={{ flex: 1, borderTop: `1px dashed ${T.border}` }} />
+                              <span style={{ fontSize: 11, color: T.inkMuted, whiteSpace: "nowrap", padding: "3px 12px", background: T.surfaceAlt, border: `1px solid ${T.border}`, borderRadius: T.rFull, userSelect: "none" }}>
+                                Không làm việc
+                              </span>
+                              <div style={{ flex: 1, borderTop: `1px dashed ${T.border}` }} />
+                            </div>
+                          ) : isFull ? (
+                            /* Full day: start → end + break — all display only */
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                              <TimeChip value={wt.start} label="Vào" />
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.inkMuted} strokeWidth="2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                              <TimeChip value={wt.end} label="Ra" />
+                              <div style={{ width: 1, height: 36, background: T.borderLight, margin: "0 2px" }} />
+                              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                <span style={{ fontSize: 9, color: "#92400E", fontWeight: 700, textTransform: "uppercase" }}>Nghỉ trưa</span>
+                                <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 10px", background: "#FFF7ED", border: "1px solid #FED7AA", borderRadius: T.rSm, userSelect: "none" }}>
+                                  <span style={{ fontSize: 13, fontWeight: 700, color: "#92400E" }}>{wt.breakStart || "12:00"}</span>
+                                  <span style={{ fontSize: 11, color: "#D97706" }}>—</span>
+                                  <span style={{ fontSize: 13, fontWeight: 700, color: "#92400E" }}>{wt.breakEnd || "13:00"}</span>
+                                </div>
+                              </div>
+                              <div style={{ marginLeft: "auto", padding: "5px 12px", borderRadius: T.rFull, background: T.primarySoft, border: `1px solid ${T.primary}30`, userSelect: "none" }}>
+                                <span style={{ fontSize: 13, fontWeight: 800, fontFamily: T.fontD, color: T.primary }}>8h</span>
+                              </div>
+                            </div>
+                          ) : isHalfAM ? (
+                            /* Half AM — display only, 2 sessions */
+                            <div style={{ display: "flex", flexDirection: "column", gap: 7, width: "100%" }}>
+                              {/* Morning session */}
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: T.accentSoft, borderRadius: T.rSm, border: `1px solid ${T.accent}30` }}>
+                                <span style={{ fontSize: 13 }}>🌅</span>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: T.accent, minWidth: 48 }}>Sáng</span>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <span style={{ fontSize: 13, fontWeight: 700, color: T.ink, fontVariantNumeric: "tabular-nums" }}>{wt.start}</span>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={T.inkMuted} strokeWidth="2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                                  <span style={{ fontSize: 13, fontWeight: 700, color: T.ink, fontVariantNumeric: "tabular-nums" }}>{wt.end || "12:00"}</span>
+                                </div>
+                                <div style={{ marginLeft: "auto", padding: "3px 10px", borderRadius: T.rFull, background: "white", border: `1px solid ${T.accent}40`, userSelect: "none" }}>
+                                  <span style={{ fontSize: 12, fontWeight: 800, fontFamily: T.fontD, color: T.accent }}>4h</span>
+                                </div>
+                              </div>
+                              {/* Afternoon off */}
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", background: T.surfaceAlt, borderRadius: T.rSm, border: `1px dashed ${T.border}`, opacity: 0.5 }}>
+                                <span style={{ fontSize: 13 }}>🌆</span>
+                                <span style={{ fontSize: 11, color: T.inkMuted, minWidth: 48 }}>Chiều</span>
+                                <span style={{ fontSize: 11, color: T.inkMuted }}>Không làm việc</span>
+                              </div>
+                            </div>
+                          ) : (
+                            /* Half PM — display only, 2 sessions */
+                            <div style={{ display: "flex", flexDirection: "column", gap: 7, width: "100%" }}>
+                              {/* Morning off */}
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 12px", background: T.surfaceAlt, borderRadius: T.rSm, border: `1px dashed ${T.border}`, opacity: 0.5 }}>
+                                <span style={{ fontSize: 13 }}>🌅</span>
+                                <span style={{ fontSize: 11, color: T.inkMuted, minWidth: 48 }}>Sáng</span>
+                                <span style={{ fontSize: 11, color: T.inkMuted }}>Không làm việc</span>
+                              </div>
+                              {/* Afternoon session */}
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: "#F5F3FF", borderRadius: T.rSm, border: "1px solid #7C3AED30" }}>
+                                <span style={{ fontSize: 13 }}>🌆</span>
+                                <span style={{ fontSize: 11, fontWeight: 700, color: "#7C3AED", minWidth: 48 }}>Chiều</span>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <span style={{ fontSize: 13, fontWeight: 700, color: T.ink, fontVariantNumeric: "tabular-nums" }}>{wt.start || "13:00"}</span>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={T.inkMuted} strokeWidth="2" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                                  <span style={{ fontSize: 13, fontWeight: 700, color: T.ink, fontVariantNumeric: "tabular-nums" }}>{wt.end}</span>
+                                </div>
+                                <div style={{ marginLeft: "auto", padding: "3px 10px", borderRadius: T.rFull, background: "white", border: "1px solid #7C3AED40", userSelect: "none" }}>
+                                  <span style={{ fontSize: 12, fontWeight: 800, fontFamily: T.fontD, color: "#7C3AED" }}>4h</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </Card>
+
+                {/* Extra info */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  {[
+                    { label: "Ca làm việc",      value: "Hành chính (giờ chuẩn)",    color: T.ink     },
+                    { label: "Chính sách WFH",   value: "Tối đa 2 ngày/tuần",       color: T.ink     },
+                    { label: "Tính giờ muộn từ", value: "08:01",                     color: T.warning },
+                    { label: "Múi giờ",           value: "Asia/Ho_Chi_Minh (UTC+7)", color: T.ink     },
+                  ].map((item, i) => (
+                    <div key={i} style={{ padding: "12px 16px", background: T.surface, borderRadius: T.rSm, border: `1px solid ${T.border}` }}>
+                      <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 4 }}>{item.label}</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: item.color }}>{item.value}</div>
+                    </div>
                   ))}
                 </div>
-              </div>
-
-              <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div style={{ padding: "12px 16px", background: T.surfaceAlt, borderRadius: T.rSm }}>
-                  <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 4 }}>Ca làm việc</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: T.ink }}>Hành chính (giờ chuẩn)</div>
-                </div>
-                <div style={{ padding: "12px 16px", background: T.surfaceAlt, borderRadius: T.rSm }}>
-                  <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 4 }}>Chính sách WFH</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: T.ink }}>Tối đa 2 ngày/tuần</div>
-                </div>
-                <div style={{ padding: "12px 16px", background: T.surfaceAlt, borderRadius: T.rSm }}>
-                  <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 4 }}>Tính giờ muộn từ</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: T.warning }}>08:01</div>
-                </div>
-                <div style={{ padding: "12px 16px", background: T.surfaceAlt, borderRadius: T.rSm }}>
-                  <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 4 }}>Múi giờ</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: T.ink }}>Asia/Ho_Chi_Minh (UTC+7)</div>
-                </div>
-              </div>
-
-              <div style={{ marginTop: 12, padding: "10px 14px", background: "#FFFBEB", border: "1px solid #FCD34D", borderRadius: T.rSm, fontSize: 12, color: "#92400E" }}>
-                💡 Để thay đổi lịch làm việc, vui lòng liên hệ phòng Nhân sự.
-              </div>
-            </Card>
-          </>)}
+              </>
+            );
+          })()}
 
           {/* ══════════════ SYSTEM TABS (admin only) ══════════════ */}
 
@@ -4176,22 +4343,131 @@ const SettingsPage = () => {
           {effectiveTab === "schedule" && isAdmin && (<>
             <Card>
               <h3 style={{ fontFamily: T.fontD, fontSize: 16, fontWeight: 700, margin: "0 0 6px" }}>Lịch làm việc công ty</h3>
-              <p style={{ fontSize: 12, color: T.inkMuted, margin: "0 0 20px" }}>Cấu hình giờ làm việc, ca, và ngày nghỉ hàng tuần</p>
+              <p style={{ fontSize: 12, color: T.inkMuted, margin: "0 0 20px" }}>Cấu hình giờ làm việc, ca, và trạng thái từng ngày trong tuần</p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, maxWidth: 560 }}>
-                <Input label="Giờ bắt đầu" value="08:00" type="time" />
-                <Input label="Giờ kết thúc" value="17:00" type="time" />
-                <Input label="Nghỉ trưa" value="12:00 — 13:00" />
+                <Input label="Giờ bắt đầu (mặc định)" value="08:00" type="time" />
+                <Input label="Giờ kết thúc (mặc định)" value="17:00" type="time" />
+                <Input label="Nghỉ trưa (mặc định)" value="12:00 — 13:00" />
               </div>
-              <div style={{ marginTop: 16 }}>
-                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 8 }}>Ngày làm việc trong tuần</label>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {["T2","T3","T4","T5","T6","T7","CN"].map((d, i) => (
-                    <div key={d} style={{ width: 44, height: 44, borderRadius: T.r, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 600, cursor: "pointer", background: i < 5 ? T.primarySoft : T.surfaceAlt, color: i < 5 ? T.primary : T.inkMuted, border: `2px solid ${i < 5 ? T.primary : T.border}` }}>{d}</div>
-                  ))}
+
+              {/* ── Ngày làm việc ── */}
+              <div style={{ marginTop: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: T.inkSoft }}>Trạng thái từng ngày trong tuần</label>
+                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    {[
+                      { label: "Full Day",    dot: T.primary },
+                      { label: "Half Day AM", dot: T.accent  },
+                      { label: "Half Day PM", dot: "#7C3AED" },
+                      { label: "Off Day",     dot: T.border  },
+                    ].map(l => (
+                      <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: T.inkMuted }}>
+                        <div style={{ width: 7, height: 7, borderRadius: "50%", background: l.dot }} />{l.label}
+                      </div>
+                    ))}
+                  </div>
                 </div>
+
+                {/* Day cards — 7 columns */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 8 }}>
+                  {[
+                    { key: "T2", label: "Thứ 2" }, { key: "T3", label: "Thứ 3" },
+                    { key: "T4", label: "Thứ 4" }, { key: "T5", label: "Thứ 5" },
+                    { key: "T6", label: "Thứ 6" }, { key: "T7", label: "Thứ 7" },
+                    { key: "CN", label: "CN"     },
+                  ].map(({ key, label }) => {
+                    const val = weekSchedule[key];
+                    const isOff   = val === "off";
+                    const isFull  = val === "full";
+                    const isHalfAM = val === "half-am";
+                    const isHalfPM = val === "half-pm";
+                    const isHalf  = isHalfAM || isHalfPM;
+
+                    const CFG = {
+                      "full":    { bg: T.primarySoft, border: T.primary,  color: T.primary,  icon: "☀️",  text: "Full"    },
+                      "half-am": { bg: T.accentSoft,  border: T.accent,   color: T.accent,   icon: "🌅",  text: "AM"      },
+                      "half-pm": { bg: "#F5F3FF",     border: "#7C3AED",  color: "#7C3AED",  icon: "🌆",  text: "PM"      },
+                      "off":     { bg: T.surfaceAlt,  border: T.border,   color: T.inkMuted, icon: "—",   text: "Off"     },
+                    }[val];
+
+                    const OPTS = [
+                      { v: "full",    lbl: "Full",   ac: T.primary  },
+                      { v: "half-am", lbl: "½ AM",   ac: T.accent   },
+                      { v: "half-pm", lbl: "½ PM",   ac: "#7C3AED"  },
+                      { v: "off",     lbl: "Off",    ac: T.inkMuted },
+                    ];
+
+                    return (
+                      <div key={key} style={{ display: "flex", flexDirection: "column", borderRadius: T.r, border: `2px solid ${CFG.border}`, overflow: "hidden", background: CFG.bg, transition: "border 0.15s" }}>
+                        {/* Day name */}
+                        <div style={{ padding: "7px 4px 5px", textAlign: "center", borderBottom: `1px solid ${CFG.border}20` }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: CFG.color }}>{key}</div>
+                          <div style={{ fontSize: 9,  color: CFG.color, opacity: 0.7, marginTop: 1 }}>{label}</div>
+                        </div>
+                        {/* Status icon */}
+                        <div style={{ padding: "7px 4px 5px", textAlign: "center", borderBottom: `1px solid ${CFG.border}20` }}>
+                          <div style={{ fontSize: 16, lineHeight: 1 }}>{CFG.icon}</div>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: CFG.color, marginTop: 2 }}>{CFG.text}</div>
+                        </div>
+                        {/* Toggle buttons */}
+                        <div style={{ display: "flex", flexDirection: "column" }}>
+                          {OPTS.map((opt, oi) => (
+                            <button key={opt.v} onClick={() => setDay(key, opt.v)} style={{
+                              padding: "5px 2px",
+                              border: "none", borderTop: oi > 0 ? `1px solid ${T.borderLight}` : "none",
+                              background: val === opt.v ? `${opt.ac}18` : "transparent",
+                              color: val === opt.v ? opt.ac : T.inkMuted,
+                              fontSize: 10, fontWeight: val === opt.v ? 700 : 400,
+                              cursor: "pointer", textAlign: "center", transition: "all 0.12s",
+                            }}>
+                              {val === opt.v ? "✓ " : ""}{opt.lbl}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Summary bar */}
+                {(() => {
+                  const vals = Object.values(weekSchedule);
+                  const nFull = vals.filter(v => v === "full").length;
+                  const nAM   = vals.filter(v => v === "half-am").length;
+                  const nPM   = vals.filter(v => v === "half-pm").length;
+                  const nOff  = vals.filter(v => v === "off").length;
+                  const hrs   = nFull * 8 + (nAM + nPM) * 4;
+                  return (
+                    <div style={{ marginTop: 12, padding: "10px 16px", background: T.surfaceAlt, borderRadius: T.r, display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+                      {[
+                        { n: nFull, label: "Full",    color: T.primary  },
+                        { n: nAM,   label: "Half AM", color: T.accent   },
+                        { n: nPM,   label: "Half PM", color: "#7C3AED"  },
+                        { n: nOff,  label: "Off",     color: T.inkMuted },
+                      ].map(s => s.n > 0 && (
+                        <div key={s.label} style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                          <div style={{ width: 7, height: 7, borderRadius: "50%", background: s.color }} />
+                          <span style={{ fontSize: 12, color: T.inkSoft }}><b style={{ color: T.ink }}>{s.n}</b> ngày {s.label}</span>
+                        </div>
+                      ))}
+                      <div style={{ marginLeft: "auto", padding: "3px 12px", borderRadius: T.rFull, background: T.primarySoft, fontSize: 12, fontWeight: 700, color: T.primary }}>
+                        Tổng {hrs} giờ / tuần
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
-              <div style={{ marginTop: 16, padding: "12px 16px", background: T.surfaceAlt, borderRadius: T.r, fontSize: 12, color: T.inkSoft }}>
-                Chế độ hiện tại: <b style={{ color: T.ink }}>5 ngày/tuần</b> · 8 giờ/ngày · Tổng: 40 giờ/tuần. Đi muộn tính từ <b style={{ color: T.warning }}>08:01</b>.
+
+              {/* Live summary text */}
+              <div style={{ marginTop: 14, padding: "10px 16px", background: T.surfaceAlt, borderRadius: T.r, fontSize: 12, color: T.inkSoft }}>
+                {(() => {
+                  const vals = Object.values(weekSchedule);
+                  const nFull = vals.filter(v => v === "full").length;
+                  const nHalf = vals.filter(v => v.startsWith("half")).length;
+                  const hrs   = nFull * 8 + nHalf * 4;
+                  const days  = nFull + nHalf * 0.5;
+                  return <>Chế độ hiện tại: <b style={{ color: T.ink }}>{days} ngày/tuần</b> · Tổng: <b style={{ color: T.ink }}>{hrs} giờ/tuần</b>. Đi muộn tính từ <b style={{ color: T.warning }}>08:01</b>.</>;
+                })()}
               </div>
               <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
                 <Btn><Ico d={IC.check} size={14} /> Lưu thay đổi</Btn>
@@ -4262,7 +4538,9 @@ const SettingsPage = () => {
                   </div>
                   <Btn v="secondary" size="sm"><Ico d={IC.add} size={14} /> Thêm loại phép</Btn>
                 </div>
-                {leaveTypes.map((lt, i) => (
+                {leaveTypes.map((lt, i) => {
+                  const linkedWf = approvalFlows.find(f => f.id === lt.workflowId);
+                  return (
                   <div key={i} style={{ padding: "16px 20px", borderBottom: i < leaveTypes.length - 1 ? `1px solid ${T.borderLight}` : "none", display: "flex", gap: 16, alignItems: "flex-start" }}>
                     <div style={{ width: 4, minHeight: 48, borderRadius: 2, background: lt.color, flexShrink: 0, marginTop: 2 }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -4294,11 +4572,20 @@ const SettingsPage = () => {
                             📄 {lt.docsDesc}
                           </div>
                         )}
+                        {/* Workflow badge */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: T.rFull, fontSize: 12, border: `1px solid ${linkedWf ? T.primary + "30" : T.border}`, background: linkedWf ? T.primarySoft : T.surfaceAlt }}>
+                          <span style={{ fontSize: 12 }}>✅</span>
+                          <span style={{ fontWeight: 600, color: linkedWf ? T.primary : T.inkMuted }}>
+                            {linkedWf ? linkedWf.type : "Chưa liên kết workflow"}
+                          </span>
+                          {linkedWf && <span style={{ color: T.inkMuted }}>· {linkedWf.steps.map(s => s.role).join(" → ")}</span>}
+                        </div>
                       </div>
                     </div>
-                    <Btn v="ghost" size="sm" onClick={() => setEditLeave(lt)}><Ico d={IC.edit} size={14} /></Btn>
+                    <Btn v="ghost" size="sm" onClick={() => { setEditLeave({ ...lt }); setWfSearch(""); }}><Ico d={IC.edit} size={14} /></Btn>
                   </div>
-                ))}
+                  );
+                })}
               </Card>
 
               {editLeave && (
@@ -4347,6 +4634,104 @@ const SettingsPage = () => {
                     {editLeave.docs && (
                       <Input label="Mô tả giấy tờ cần có" value={editLeave.docsDesc || ""} placeholder="VD: Giấy xác nhận y tế..." onChange={e => setEditLeave(p => ({ ...p, docsDesc: e.target.value }))} />
                     )}
+
+                    {/* ── Approval Workflow Mapping ── */}
+                    <div style={{ borderTop: `1px solid ${T.borderLight}`, paddingTop: 14 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, fontWeight: 700, color: T.inkSoft, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ color: T.primary }}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                          Approval Workflow
+                        </label>
+                        {editLeave.workflowId && (
+                          <button onClick={() => setEditLeave(p => ({ ...p, workflowId: null }))} style={{ fontSize: 11, color: T.danger, background: "none", border: "none", cursor: "pointer", fontWeight: 600, padding: "2px 6px" }}>
+                            Bỏ liên kết ✕
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Search input */}
+                      <div style={{ position: "relative", marginBottom: 8 }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.inkMuted} strokeWidth="2.2" strokeLinecap="round" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input
+                          type="text"
+                          placeholder="Tìm workflow..."
+                          value={wfSearch}
+                          onChange={e => setWfSearch(e.target.value)}
+                          style={{ width: "100%", padding: "8px 10px 8px 30px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 12, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box", outline: "none" }}
+                        />
+                      </div>
+
+                      {/* Workflow list */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 260, overflowY: "auto" }}>
+                        {approvalFlows
+                          .filter(fl => fl.type.toLowerCase().includes(wfSearch.toLowerCase()))
+                          .map(fl => {
+                            const isSelected = editLeave.workflowId === fl.id;
+                            const stepStr = fl.steps.map(s => s.role).join(" → ") + " → ✓";
+                            return (
+                              <div
+                                key={fl.id}
+                                onClick={() => setEditLeave(p => ({ ...p, workflowId: fl.id }))}
+                                style={{
+                                  display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 12px",
+                                  borderRadius: T.rSm, cursor: "pointer",
+                                  border: `1.5px solid ${isSelected ? T.primary : T.border}`,
+                                  background: isSelected ? T.primarySoft : T.surface,
+                                  transition: "all 0.13s",
+                                }}
+                              >
+                                {/* Radio dot */}
+                                <div style={{ width: 16, height: 16, borderRadius: "50%", flexShrink: 0, marginTop: 1, border: `2px solid ${isSelected ? T.primary : T.border}`, background: isSelected ? T.primary : "transparent", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.13s" }}>
+                                  {isSelected && <div style={{ width: 6, height: 6, borderRadius: "50%", background: "white" }} />}
+                                </div>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 13, fontWeight: isSelected ? 700 : 500, color: isSelected ? T.primary : T.ink, marginBottom: 3 }}>{fl.type}</div>
+                                  {/* Steps visualization */}
+                                  <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                                    {fl.steps.map((s, si) => (
+                                      <React.Fragment key={si}>
+                                        {si > 0 && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={T.inkMuted} strokeWidth="2.5" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>}
+                                        <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: T.rFull, background: isSelected ? `${s.c}20` : T.surfaceAlt, color: isSelected ? s.c : T.inkMuted, fontWeight: 600 }}>{s.role}</span>
+                                      </React.Fragment>
+                                    ))}
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={T.inkMuted} strokeWidth="2.5" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                                    <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: T.rFull, background: isSelected ? T.successSoft : T.surfaceAlt, color: isSelected ? T.success : T.inkMuted, fontWeight: 600 }}>✓ Hoàn tất</span>
+                                  </div>
+                                  {fl.escalation && <div style={{ fontSize: 10, color: T.inkMuted, marginTop: 3 }}>⏱ {fl.escalation}</div>}
+                                  <div style={{ display: "flex", gap: 4, marginTop: 3 }}>
+                                    {fl.autoApprove && <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3, background: T.successSoft, color: T.success, fontWeight: 600 }}>Tự động duyệt</span>}
+                                    {fl.delegation && <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3, background: T.infoSoft, color: T.info, fontWeight: 600 }}>Ủy quyền</span>}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        }
+                        {approvalFlows.filter(fl => fl.type.toLowerCase().includes(wfSearch.toLowerCase())).length === 0 && (
+                          <div style={{ textAlign: "center", padding: "20px 0", fontSize: 12, color: T.inkMuted }}>
+                            Không tìm thấy workflow phù hợp
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Selected summary */}
+                      {editLeave.workflowId && (() => {
+                        const sel = approvalFlows.find(f => f.id === editLeave.workflowId);
+                        return sel ? (
+                          <div style={{ marginTop: 8, padding: "8px 12px", background: T.successSoft, borderRadius: T.rSm, display: "flex", alignItems: "center", gap: 7, fontSize: 12 }}>
+                            <span style={{ fontSize: 14 }}>✅</span>
+                            <span style={{ color: T.success, fontWeight: 600 }}>Đã chọn: {sel.type}</span>
+                          </div>
+                        ) : null;
+                      })()}
+                      {!editLeave.workflowId && (
+                        <div style={{ marginTop: 8, padding: "8px 12px", background: T.warningSoft, borderRadius: T.rSm, fontSize: 11, color: T.warning, display: "flex", alignItems: "center", gap: 7 }}>
+                          <span>⚠</span>
+                          <span>Chưa liên kết workflow — đơn nghỉ phép loại này sẽ không có quy trình phê duyệt tự động.</span>
+                        </div>
+                      )}
+                    </div>
+
                     <div>
                       <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Ghi chú / Cơ sở pháp lý</label>
                       <textarea rows={2} value={editLeave.desc} onChange={e => setEditLeave(p => ({ ...p, desc: e.target.value }))} style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, resize: "vertical", boxSizing: "border-box" }} />
