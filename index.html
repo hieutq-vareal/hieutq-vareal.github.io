@@ -585,21 +585,31 @@ const LeavePage = ({ onNav }) => {
     { type: "Thai sản", total: 180, used: 0, pending: 0, color: "#EC4899" },
   ];
 
-  const requests = [
-    { id: "LV-041", name: "Nguyễn Văn An", type: "Phép năm", from: "15/04", to: "16/04", days: 2, status: "pending", reason: "Việc gia đình", dept: "Engineering" },
-    { id: "LV-040", name: "Trần Đức Hùng", type: "Nghỉ ốm", from: "14/04", to: "16/04", days: 3, status: "pending", reason: "Khám bệnh", dept: "Engineering" },
-    { id: "LV-039", name: "Lê Thị Mai", type: "WFH", from: "17/04", to: "17/04", days: 1, status: "pending", reason: "Bảo trì chung cư", dept: "Design" },
-    { id: "LV-038", name: "Phạm Minh Tuấn", type: "Phép năm", from: "10/04", to: "11/04", days: 2, status: "approved", reason: "Nghỉ phép", dept: "QA" },
-    { id: "LV-037", name: "Hoàng Thị Lan", type: "Phép năm", from: "07/04", to: "08/04", days: 2, status: "approved", reason: "Du lịch", dept: "Design" },
-    { id: "LV-036", name: "Vũ Đức Minh", type: "Nghỉ ốm", from: "03/04", to: "03/04", days: 1, status: "rejected", reason: "Thiếu giấy tờ", dept: "Engineering" },
-    { id: "LV-035", name: "Bùi Quang Hải", type: "Phép năm", from: "01/04", to: "02/04", days: 2, status: "approved", reason: "Cá nhân", dept: "DevOps" },
-    { id: "LV-034", name: "Đỗ Thị Hương", type: "Phép năm", from: "28/03", to: "28/03", days: 1, status: "approved", reason: "Giỗ", dept: "HR" },
-  ];
+  // Simulate current user (the leave requester)
+  const CURRENT_USER = "Nguyễn Văn An";
+
+  const [cancelModal, setCancelModal]         = useState(null); // request obj being cancelled
+  const [cancelReason, setCancelReason]       = useState("");
+  const [changeMode, setChangeMode]           = useState(false); // edit mode inside detail modal
+  const [changeForm, setChangeForm]           = useState({});   // edited copy of request
+
+  const [requests, setRequests] = useState([
+    { id: "LV-041", name: "Nguyễn Văn An",  type: "Phép năm", from: "15/04", to: "16/04", fromDt: "2026-04-15T08:00", toDt: "2026-04-16T17:00", days: 2, status: "pending",  reason: "Việc gia đình", dept: "Engineering", history: [{ step: "Đã tạo đơn", by: "Nguyễn Văn An", time: "13/04 09:30" }, { step: "Chờ Manager duyệt", by: "Trần Thị Ngọc", time: "Đang chờ" }] },
+    { id: "LV-040", name: "Trần Đức Hùng",  type: "Nghỉ ốm",  from: "14/04", to: "16/04", fromDt: "2026-04-14T08:00", toDt: "2026-04-16T17:00", days: 3, status: "pending",  reason: "Khám bệnh",    dept: "Engineering", history: [{ step: "Đã tạo đơn", by: "Trần Đức Hùng",  time: "13/04 08:00" }, { step: "Chờ Manager duyệt", by: "Trần Thị Ngọc", time: "Đang chờ" }] },
+    { id: "LV-039", name: "Lê Thị Mai",     type: "WFH",       from: "17/04", to: "17/04", fromDt: "2026-04-17T08:00", toDt: "2026-04-17T17:00", days: 1, status: "pending",  reason: "Bảo trì chung cư", dept: "Design", history: [{ step: "Đã tạo đơn", by: "Lê Thị Mai", time: "13/04 10:00" }] },
+    { id: "LV-038", name: "Phạm Minh Tuấn", type: "Phép năm", from: "10/04", to: "11/04", fromDt: "2026-04-10T08:00", toDt: "2026-04-11T17:00", days: 2, status: "approved", reason: "Nghỉ phép",    dept: "QA",          history: [{ step: "Đã tạo đơn", by: "Phạm Minh Tuấn", time: "09/04 14:00" }, { step: "Manager duyệt",    by: "Trần Thị Ngọc", time: "09/04 16:30" }] },
+    { id: "LV-037", name: "Nguyễn Văn An",  type: "Phép năm", from: "07/04", to: "08/04", fromDt: "2026-04-07T08:00", toDt: "2026-04-08T17:00", days: 2, status: "approved", reason: "Du lịch",      dept: "Engineering", history: [{ step: "Đã tạo đơn", by: "Nguyễn Văn An",  time: "05/04 09:00" }, { step: "Manager duyệt",    by: "Trần Thị Ngọc", time: "05/04 11:00" }] },
+    { id: "LV-036", name: "Vũ Đức Minh",    type: "Nghỉ ốm",  from: "03/04", to: "03/04", fromDt: "2026-04-03T08:00", toDt: "2026-04-03T17:00", days: 1, status: "rejected", reason: "Thiếu giấy tờ", dept: "Engineering", history: [{ step: "Đã tạo đơn", by: "Vũ Đức Minh",    time: "02/04 17:00" }, { step: "Manager từ chối",   by: "Trần Thị Ngọc", time: "03/04 09:00" }] },
+    { id: "LV-035", name: "Bùi Quang Hải",  type: "Phép năm", from: "01/04", to: "02/04", fromDt: "2026-04-01T08:00", toDt: "2026-04-02T17:00", days: 2, status: "approved", reason: "Cá nhân",      dept: "DevOps",      history: [{ step: "Đã tạo đơn", by: "Bùi Quang Hải",  time: "30/03 14:00" }, { step: "Manager duyệt",    by: "Trần Thị Ngọc", time: "30/03 16:00" }] },
+    { id: "LV-034", name: "Đỗ Thị Hương",   type: "Phép năm", from: "28/03", to: "28/03", fromDt: "2026-03-28T08:00", toDt: "2026-03-28T17:00", days: 1, status: "approved", reason: "Giỗ",          dept: "HR",          history: [{ step: "Đã tạo đơn", by: "Đỗ Thị Hương",   time: "27/03 10:00" }, { step: "Manager duyệt",    by: "Trần Thị Ngọc", time: "27/03 14:00" }] },
+  ]);
 
   const stMap = {
-    pending: { l: "Chờ duyệt", c: T.warning, bg: T.warningSoft },
-    approved: { l: "Đã duyệt", c: T.success, bg: T.successSoft },
-    rejected: { l: "Từ chối", c: T.danger, bg: T.dangerSoft },
+    pending:        { l: "Chờ duyệt",       c: T.warning,  bg: T.warningSoft  },
+    approved:       { l: "Đã duyệt",         c: T.success,  bg: T.successSoft  },
+    rejected:       { l: "Từ chối",          c: T.danger,   bg: T.dangerSoft   },
+    pending_cancel: { l: "Chờ duyệt hủy",   c: "#D97706",  bg: "#FEF3C7"      },
+    changed:        { l: "Đã chỉnh sửa",     c: T.info,     bg: T.infoSoft     },
   };
 
   return (
@@ -1206,55 +1216,258 @@ const LeavePage = ({ onNav }) => {
 
       {/* DETAIL MODAL */}
       {modal && typeof modal === "object" && (
-        <Modal title={`Chi tiết đơn ${modal.id}`} onClose={() => setModal(null)} width={500}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: T.surfaceAlt, borderRadius: T.r }}>
-              <Avatar name={modal.name} size={40} />
+        <Modal
+          title={changeMode ? `Chỉnh sửa đơn ${modal.id}` : `Chi tiết đơn ${modal.id}`}
+          onClose={() => { setModal(null); setChangeMode(false); setCancelReason(""); }}
+          width={560}
+        >
+          {changeMode ? (
+            /* ── CHANGE REQUEST MODE ── */
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", background: T.infoSoft, border: `1px solid ${T.info}30`, borderRadius: T.rSm }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.info} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span style={{ fontSize: 12, color: T.info }}>Sau khi submit, đơn sẽ được gửi lại cho người duyệt và chuyển về <b>Chờ duyệt</b>.</span>
+              </div>
+
+              {/* Loại nghỉ phép */}
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: T.ink }}>{modal.name}</div>
-                <div style={{ fontSize: 12, color: T.inkMuted }}>{modal.dept}</div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Loại nghỉ phép *</label>
+                <select value={changeForm.type} onChange={e => setChangeForm(p => ({ ...p, type: e.target.value }))}
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1.5px solid ${T.primary}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface, boxSizing: "border-box" }}>
+                  {leavePolicies.map(lp => <option key={lp.id} value={lp.type}>{lp.type}</option>)}
+                </select>
               </div>
-              <div style={{ marginLeft: "auto" }}><Badge color={stMap[modal.status].c} bg={stMap[modal.status].bg} dot>{stMap[modal.status].l}</Badge></div>
+
+              {/* Datetime pickers */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Từ ngày & giờ *</label>
+                  <input type="datetime-local" value={changeForm.fromDt || ""}
+                    onChange={e => setChangeForm(p => ({ ...p, fromDt: e.target.value }))}
+                    style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1.5px solid ${T.primary}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Đến ngày & giờ *</label>
+                  <input type="datetime-local" value={changeForm.toDt || ""}
+                    min={changeForm.fromDt || undefined}
+                    onChange={e => setChangeForm(p => ({ ...p, toDt: e.target.value }))}
+                    style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1.5px solid ${T.primary}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, boxSizing: "border-box" }} />
+                </div>
+              </div>
+
+              {/* Lý do */}
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Lý do *</label>
+                <textarea rows={3} value={changeForm.reason || ""}
+                  onChange={e => setChangeForm(p => ({ ...p, reason: e.target.value }))}
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1.5px solid ${T.primary}`, fontSize: 13, fontFamily: T.fontB, resize: "vertical", boxSizing: "border-box" }} />
+              </div>
+
+              {/* File */}
+              <div style={{ border: `2px dashed ${T.border}`, borderRadius: T.r, padding: 14, textAlign: "center", fontSize: 12, color: T.inkMuted, cursor: "pointer" }}>
+                📎 Kéo thả hoặc <span style={{ color: T.primary, fontWeight: 600 }}>chọn tệp đính kèm</span>
+                <div style={{ fontSize: 10, marginTop: 2 }}>PDF, JPG, PNG — Tối đa 5MB</div>
+              </div>
+
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 4, borderTop: `1px solid ${T.borderLight}` }}>
+                <Btn v="secondary" onClick={() => setChangeMode(false)}>Quay lại</Btn>
+                <Btn onClick={() => {
+                  if (!changeForm.reason?.trim()) return;
+                  setRequests(prev => prev.map(r => r.id === modal.id
+                    ? { ...r, ...changeForm, status: "pending",
+                        history: [...(r.history || []), { step: "Đã chỉnh sửa & gửi lại", by: CURRENT_USER, time: "Vừa xong" }, { step: "Chờ Manager duyệt lại", by: "Trần Thị Ngọc", time: "Đang chờ" }] }
+                    : r));
+                  setModal(prev => ({ ...prev, ...changeForm, status: "pending" }));
+                  setChangeMode(false);
+                }}>
+                  <Ico d={IC.check} size={14} /> Gửi lại đơn
+                </Btn>
+              </div>
             </div>
-            {[
-              ["Loại nghỉ phép", modal.type],
-              ["Thời gian", `${modal.from}${modal.to !== modal.from ? ` → ${modal.to}` : ""}`],
-              ["Số ngày", `${modal.days} ngày`],
-              ["Lý do", modal.reason],
-              ["Ngày tạo", "13/04/2026 09:30"],
-              ["Người duyệt", "Trần Thị Ngọc"],
-            ].map(([k, v], i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${T.borderLight}` }}>
-                <span style={{ fontSize: 12, color: T.inkMuted, fontWeight: 600 }}>{k}</span>
-                <span style={{ fontSize: 13, color: T.ink, fontWeight: 500 }}>{v}</span>
+          ) : (
+            /* ── DETAIL VIEW ── */
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {/* Header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: T.surfaceAlt, borderRadius: T.r }}>
+                <Avatar name={modal.name} size={40} />
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: T.ink }}>{modal.name}</div>
+                  <div style={{ fontSize: 12, color: T.inkMuted }}>{modal.dept}</div>
+                </div>
+                <div style={{ marginLeft: "auto" }}>
+                  <Badge color={stMap[modal.status]?.c || T.inkMuted} bg={stMap[modal.status]?.bg || T.surfaceAlt} dot>
+                    {stMap[modal.status]?.l || modal.status}
+                  </Badge>
+                </div>
               </div>
-            ))}
-            {/* Approval Timeline */}
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: T.inkMuted, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Lịch sử phê duyệt</div>
+
+              {/* Info rows */}
               {[
-                { step: "Đã tạo đơn", by: modal.name, time: "13/04 09:30", done: true },
-                { step: "Chờ Director duyệt", by: "Trần Thị Ngọc", time: modal.status === "pending" ? "Đang chờ" : "13/04 10:15", done: modal.status !== "pending" },
-                ...(modal.status !== "pending" ? [{ step: modal.status === "approved" ? "Đã duyệt" : "Từ chối", by: "Trần Thị Ngọc", time: "13/04 10:15", done: true }] : []),
-              ].map((s, i) => (
-                <div key={i} style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: s.done ? T.success : T.border, border: `2px solid ${s.done ? T.success : T.border}` }} />
-                    {i < 2 && <div style={{ width: 2, height: 24, background: T.borderLight }} />}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: T.ink }}>{s.step}</div>
-                    <div style={{ fontSize: 11, color: T.inkMuted }}>{s.by} · {s.time}</div>
-                  </div>
+                ["Mã đơn",       modal.id],
+                ["Loại nghỉ phép", modal.type],
+                ["Thời gian",    `${modal.from}${modal.to !== modal.from ? ` → ${modal.to}` : ""}`],
+                ["Số ngày",      `${modal.days} ngày`],
+                ["Lý do",        modal.reason],
+                ["Người duyệt",  "Trần Thị Ngọc"],
+              ].map(([k, v], i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${T.borderLight}` }}>
+                  <span style={{ fontSize: 12, color: T.inkMuted, fontWeight: 600 }}>{k}</span>
+                  <span style={{ fontSize: 13, color: T.ink, fontWeight: 500 }}>{v}</span>
                 </div>
               ))}
-            </div>
-            {modal.status === "pending" && (
-              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
-                <Btn v="danger">Từ chối</Btn>
-                <Btn>Phê duyệt</Btn>
+
+              {/* Approval Timeline */}
+              <div style={{ marginTop: 4 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: T.inkMuted, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Lịch sử xử lý</div>
+                {(modal.history || []).map((s, i, arr) => (
+                  <div key={i} style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                      <div style={{ width: 10, height: 10, borderRadius: "50%", background: s.time === "Đang chờ" ? T.border : T.success, border: `2px solid ${s.time === "Đang chờ" ? T.border : T.success}`, flexShrink: 0 }} />
+                      {i < arr.length - 1 && <div style={{ width: 2, flex: 1, minHeight: 16, background: T.borderLight, margin: "2px 0" }} />}
+                    </div>
+                    <div style={{ paddingBottom: 4 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: T.ink }}>{s.step}</div>
+                      <div style={{ fontSize: 11, color: T.inkMuted }}>{s.by} · {s.time}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            )}
+
+              {/* ── ACTION BUTTONS based on status + owner ── */}
+              <div style={{ borderTop: `1px solid ${T.borderLight}`, paddingTop: 12 }}>
+                {/* Owner: pending → Change + Cancel */}
+                {modal.status === "pending" && modal.name === CURRENT_USER && (
+                  <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                    <Btn v="secondary" onClick={() => {
+                      setChangeForm({ type: modal.type, fromDt: modal.fromDt, toDt: modal.toDt, reason: modal.reason });
+                      setChangeMode(true);
+                    }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      Change Request
+                    </Btn>
+                    <Btn v="danger" onClick={() => { setCancelModal(modal); setCancelReason(""); }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                      Cancel Request
+                    </Btn>
+                  </div>
+                )}
+
+                {/* Owner: approved → Cancel only */}
+                {modal.status === "approved" && modal.name === CURRENT_USER && (
+                  <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ fontSize: 11, color: T.inkMuted }}>Đơn đã duyệt. Hủy sẽ cần được người duyệt xác nhận.</div>
+                    <Btn v="danger" onClick={() => { setCancelModal(modal); setCancelReason(""); }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                      Cancel Request
+                    </Btn>
+                  </div>
+                )}
+
+                {/* Manager: pending → Approve/Reject */}
+                {modal.status === "pending" && modal.name !== CURRENT_USER && (
+                  <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                    <Btn v="danger" onClick={() => {
+                      setRequests(prev => prev.map(r => r.id === modal.id ? { ...r, status: "rejected" } : r));
+                      setModal(p => ({ ...p, status: "rejected" }));
+                    }}>Từ chối</Btn>
+                    <Btn onClick={() => {
+                      setRequests(prev => prev.map(r => r.id === modal.id ? { ...r, status: "approved" } : r));
+                      setModal(p => ({ ...p, status: "approved" }));
+                    }}>Phê duyệt</Btn>
+                  </div>
+                )}
+
+                {/* pending_cancel → manager sees cancel approval */}
+                {modal.status === "pending_cancel" && modal.name !== CURRENT_USER && (
+                  <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", alignItems: "center" }}>
+                    <div style={{ fontSize: 11, color: "#92400E", flex: 1 }}>⚠ Nhân viên yêu cầu hủy đơn này.</div>
+                    <Btn v="secondary" onClick={() => {
+                      setRequests(prev => prev.map(r => r.id === modal.id ? { ...r, status: "approved" } : r));
+                      setModal(p => ({ ...p, status: "approved" }));
+                    }}>Từ chối hủy</Btn>
+                    <Btn v="danger" onClick={() => {
+                      setRequests(prev => prev.map(r => r.id === modal.id ? { ...r, status: "rejected" } : r));
+                      setModal(p => ({ ...p, status: "rejected" }));
+                    }}>Xác nhận hủy</Btn>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {/* ── CANCEL REQUEST MODAL ── */}
+      {cancelModal && (
+        <Modal title="Hủy đơn nghỉ phép" onClose={() => { setCancelModal(null); setCancelReason(""); }} width={460}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Request summary */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: T.surfaceAlt, borderRadius: T.rSm }}>
+              <Avatar name={cancelModal.name} size={32} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: T.ink }}>{cancelModal.id} · {cancelModal.type}</div>
+                <div style={{ fontSize: 11, color: T.inkMuted }}>{cancelModal.from} → {cancelModal.to} · {cancelModal.days} ngày</div>
+              </div>
+              <Badge color={stMap[cancelModal.status]?.c} bg={stMap[cancelModal.status]?.bg} dot style={{ marginLeft: "auto" }}>
+                {stMap[cancelModal.status]?.l}
+              </Badge>
+            </div>
+
+            {/* Warning */}
+            <div style={{ padding: "10px 14px", background: T.warningSoft, border: `1px solid ${T.warning}30`, borderRadius: T.rSm, display: "flex", gap: 8, alignItems: "flex-start" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.warning} strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 1 }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <span style={{ fontSize: 12, color: T.warning }}>
+                {cancelModal.status === "approved"
+                  ? "Đơn đã được duyệt. Việc hủy cần được người phê duyệt xác nhận. Trạng thái sẽ chuyển sang Chờ duyệt hủy."
+                  : "Đơn đang chờ duyệt sẽ bị hủy. Người duyệt sẽ được thông báo."}
+              </span>
+            </div>
+
+            {/* Lý do hủy — bắt buộc */}
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>
+                Lý do hủy đơn *
+                <span style={{ color: T.danger, marginLeft: 4 }}>(Bắt buộc)</span>
+              </label>
+              <textarea
+                rows={4}
+                placeholder="Nhập lý do hủy đơn nghỉ phép..."
+                value={cancelReason}
+                onChange={e => setCancelReason(e.target.value)}
+                style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1.5px solid ${cancelReason ? T.primary : T.border}`, fontSize: 13, fontFamily: T.fontB, resize: "vertical", boxSizing: "border-box", outline: "none" }}
+              />
+              {cancelReason.length === 0 && (
+                <div style={{ fontSize: 11, color: T.danger, marginTop: 4 }}>⚠ Vui lòng nhập lý do hủy</div>
+              )}
+            </div>
+
+            {/* Notify info */}
+            <div style={{ padding: "8px 12px", background: T.infoSoft, borderRadius: T.rSm, fontSize: 11, color: T.info }}>
+              📧 Thông báo sẽ được gửi tới: <b>Trần Thị Ngọc (Manager)</b>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 4, borderTop: `1px solid ${T.borderLight}` }}>
+              <Btn v="secondary" onClick={() => { setCancelModal(null); setCancelReason(""); }}>Quay lại</Btn>
+              <Btn
+                v="danger"
+                onClick={() => {
+                  if (!cancelReason.trim()) return;
+                  const newStatus = cancelModal.status === "approved" ? "pending_cancel" : "rejected";
+                  const historyEntry = cancelModal.status === "approved"
+                    ? { step: "Yêu cầu hủy — chờ xác nhận", by: CURRENT_USER, time: "Vừa xong" }
+                    : { step: `Đã hủy đơn (${cancelReason})`, by: CURRENT_USER, time: "Vừa xong" };
+                  setRequests(prev => prev.map(r => r.id === cancelModal.id
+                    ? { ...r, status: newStatus, cancelReason, history: [...(r.history || []), historyEntry] }
+                    : r));
+                  setCancelModal(null);
+                  setCancelReason("");
+                  setModal(null);
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                Xác nhận hủy đơn
+              </Btn>
+            </div>
           </div>
         </Modal>
       )}
