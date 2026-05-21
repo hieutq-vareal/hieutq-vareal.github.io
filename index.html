@@ -593,6 +593,16 @@ const LeavePage = ({ onNav }) => {
   const [changeMode, setChangeMode]           = useState(false); // edit mode inside detail modal
   const [changeForm, setChangeForm]           = useState({});   // edited copy of request
 
+  // ── Search & filter states ──────────────────────────────────
+  const [srchName,      setSrchName]      = useState("");
+  const [srchFrom,      setSrchFrom]      = useState("");
+  const [srchTo,        setSrchTo]        = useState("");
+  const [srchDept,      setSrchDept]      = useState("");
+  const [srchType,      setSrchType]      = useState("");
+  const [srchReason,    setSrchReason]    = useState("");
+  const [srchStatus,    setSrchStatus]    = useState("");
+  const [showAdvSearch, setShowAdvSearch] = useState(false);
+
   const [requests, setRequests] = useState([
     { id: "LV-041", name: "Nguyễn Văn An",  type: "Phép năm", from: "15/04", to: "16/04", fromDt: "2026-04-15T08:00", toDt: "2026-04-16T17:00", days: 2, status: "pending",  reason: "Việc gia đình", dept: "Engineering", history: [{ step: "Đã tạo đơn", by: "Nguyễn Văn An", time: "13/04 09:30" }, { step: "Chờ Manager duyệt", by: "Trần Thị Ngọc", time: "Đang chờ" }] },
     { id: "LV-040", name: "Trần Đức Hùng",  type: "Nghỉ ốm",  from: "14/04", to: "16/04", fromDt: "2026-04-14T08:00", toDt: "2026-04-16T17:00", days: 3, status: "pending",  reason: "Khám bệnh",    dept: "Engineering", history: [{ step: "Đã tạo đơn", by: "Trần Đức Hùng",  time: "13/04 08:00" }, { step: "Chờ Manager duyệt", by: "Trần Thị Ngọc", time: "Đang chờ" }] },
@@ -611,6 +621,37 @@ const LeavePage = ({ onNav }) => {
     pending_cancel: { l: "Chờ duyệt hủy",   c: "#D97706",  bg: "#FEF3C7"      },
     changed:        { l: "Đã chỉnh sửa",     c: T.info,     bg: T.infoSoft     },
   };
+
+  // ── Computed filtered requests ────────────────────────────────
+  const hasSearchFilters = srchName || srchFrom || srchTo || srchDept || srchType || srchReason || srchStatus;
+
+  const filteredRequests = requests.filter(r => {
+    if (srchName   && !r.name.toLowerCase().includes(srchName.toLowerCase()))   return false;
+    if (srchDept   && r.dept !== srchDept)                                        return false;
+    if (srchType   && r.type !== srchType)                                        return false;
+    if (srchStatus && r.status !== srchStatus)                                    return false;
+    if (srchReason && !r.reason.toLowerCase().includes(srchReason.toLowerCase())) return false;
+    // Date range: compare "DD/MM" against srchFrom/srchTo (YYYY-MM-DD)
+    if (srchFrom) {
+      const [fd, fm] = (r.from || "").split("/");
+      const fromDate = new Date(`2026-${fm}-${fd}`);
+      if (!isNaN(fromDate) && fromDate < new Date(srchFrom)) return false;
+    }
+    if (srchTo) {
+      const [td, tm] = (r.to || "").split("/");
+      const toDate = new Date(`2026-${tm}-${td}`);
+      if (!isNaN(toDate) && toDate > new Date(srchTo)) return false;
+    }
+    return true;
+  });
+
+  const clearSearch = () => {
+    setSrchName(""); setSrchFrom(""); setSrchTo("");
+    setSrchDept(""); setSrchType(""); setSrchReason(""); setSrchStatus("");
+  };
+
+  const allDepts  = [...new Set(requests.map(r => r.dept).filter(Boolean))].sort();
+  const allTypes  = [...new Set(requests.map(r => r.type).filter(Boolean))].sort();
 
   return (
     <div>
@@ -655,25 +696,170 @@ const LeavePage = ({ onNav }) => {
 
       {tab === "requests" && (
         <Card style={{ padding: 0, overflow: "hidden" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px", borderBottom: `1px solid ${T.borderLight}` }}>
-            <div style={{ display: "flex", gap: 8 }}>
-              {["Tất cả", "Chờ duyệt", "Đã duyệt", "Từ chối"].map((f, i) => (
-                <Btn key={f} v={i === 0 ? "primary" : "secondary"} size="sm">{f}</Btn>
-              ))}
+
+          {/* ── Search bar ── */}
+          <div style={{ padding: "14px 16px", borderBottom: `1px solid ${T.borderLight}` }}>
+
+            {/* Basic search row */}
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              {/* Text search */}
+              <div style={{ position: "relative", flex: "1 1 200px", minWidth: 160 }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.inkMuted} strokeWidth="2.2" strokeLinecap="round" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Tìm theo tên nhân viên..."
+                  value={srchName}
+                  onChange={e => setSrchName(e.target.value)}
+                  style={{ width: "100%", padding: "8px 28px 8px 32px", borderRadius: T.rSm, border: `1.5px solid ${srchName ? T.primary : T.border}`, fontSize: 13, fontFamily: T.fontB, background: T.surface, boxSizing: "border-box", outline: "none", color: T.ink }}
+                />
+                {srchName && (
+                  <button onClick={() => setSrchName("")} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: T.inkMuted, fontSize: 14, lineHeight: 1, padding: 2 }}>✕</button>
+                )}
+              </div>
+
+              {/* From date */}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flex: "0 0 auto" }}>
+                <span style={{ fontSize: 12, color: T.inkMuted, fontWeight: 600, whiteSpace: "nowrap" }}>Từ</span>
+                <input
+                  type="date"
+                  value={srchFrom}
+                  onChange={e => setSrchFrom(e.target.value)}
+                  style={{ padding: "8px 10px", borderRadius: T.rSm, border: `1.5px solid ${srchFrom ? T.primary : T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: srchFrom ? T.primarySoft : T.surface, outline: "none", cursor: "pointer" }}
+                />
+              </div>
+
+              {/* To date */}
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flex: "0 0 auto" }}>
+                <span style={{ fontSize: 12, color: T.inkMuted, fontWeight: 600, whiteSpace: "nowrap" }}>Đến</span>
+                <input
+                  type="date"
+                  value={srchTo}
+                  min={srchFrom || undefined}
+                  onChange={e => setSrchTo(e.target.value)}
+                  style={{ padding: "8px 10px", borderRadius: T.rSm, border: `1.5px solid ${srchTo ? T.primary : T.border}`, fontSize: 13, fontFamily: T.fontB, color: T.ink, background: srchTo ? T.primarySoft : T.surface, outline: "none", cursor: "pointer" }}
+                />
+              </div>
+
+              {/* Advanced toggle */}
+              <button
+                onClick={() => setShowAdvSearch(v => !v)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 6, padding: "8px 12px",
+                  borderRadius: T.rSm, border: `1.5px solid ${showAdvSearch || (srchDept||srchType||srchStatus||srchReason) ? T.primary : T.border}`,
+                  background: showAdvSearch || (srchDept||srchType||srchStatus||srchReason) ? T.primarySoft : T.surface,
+                  color: showAdvSearch || (srchDept||srchType||srchStatus||srchReason) ? T.primary : T.inkSoft,
+                  fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.13s", position: "relative", flexShrink: 0,
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ transform: showAdvSearch ? "rotate(90deg)" : "rotate(0)", transition: "transform 0.15s" }}>
+                  <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+                </svg>
+                Nâng cao
+                {(srchDept||srchType||srchStatus||srchReason) && (
+                  <span style={{ width: 16, height: 16, borderRadius: "50%", background: T.primary, color: "white", fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", position: "absolute", top: -6, right: -6 }}>
+                    {[srchDept, srchType, srchStatus, srchReason].filter(Boolean).length}
+                  </span>
+                )}
+              </button>
+
+              {/* Clear all */}
+              {hasSearchFilters && (
+                <button onClick={clearSearch} style={{ padding: "8px 12px", borderRadius: T.rSm, border: "none", background: "none", color: T.danger, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
+                  ✕ Xóa bộ lọc
+                </button>
+              )}
+
+              {/* Export */}
+              <Btn v="secondary" size="sm" style={{ marginLeft: "auto", flexShrink: 0 }}>
+                <Ico d={IC.download} size={14} /> Xuất Excel
+              </Btn>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <Input placeholder="Tìm kiếm..." style={{ width: 200, fontSize: 12 }} />
-              <Btn v="secondary" size="sm"><Ico d={IC.download} size={14} /> Xuất Excel</Btn>
-            </div>
+
+            {/* Advanced search panel */}
+            {showAdvSearch && (
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px dashed ${T.border}`, display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, animation: "fadeIn 0.15s ease" }}>
+
+                {/* Phòng ban */}
+                <div>
+                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>Phòng ban</label>
+                  <select value={srchDept} onChange={e => setSrchDept(e.target.value)}
+                    style={{ width: "100%", padding: "7px 10px", borderRadius: T.rSm, border: `1.5px solid ${srchDept ? T.primary : T.border}`, fontSize: 12, fontFamily: T.fontB, color: T.ink, background: srchDept ? T.primarySoft : T.surface, boxSizing: "border-box" }}>
+                    <option value="">Tất cả phòng ban</option>
+                    {allDepts.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+
+                {/* Loại phép */}
+                <div>
+                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>Loại nghỉ phép</label>
+                  <select value={srchType} onChange={e => setSrchType(e.target.value)}
+                    style={{ width: "100%", padding: "7px 10px", borderRadius: T.rSm, border: `1.5px solid ${srchType ? T.primary : T.border}`, fontSize: 12, fontFamily: T.fontB, color: T.ink, background: srchType ? T.primarySoft : T.surface, boxSizing: "border-box" }}>
+                    <option value="">Tất cả loại phép</option>
+                    {allTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+
+                {/* Trạng thái */}
+                <div>
+                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>Trạng thái</label>
+                  <select value={srchStatus} onChange={e => setSrchStatus(e.target.value)}
+                    style={{ width: "100%", padding: "7px 10px", borderRadius: T.rSm, border: `1.5px solid ${srchStatus ? T.primary : T.border}`, fontSize: 12, fontFamily: T.fontB, color: T.ink, background: srchStatus ? T.primarySoft : T.surface, boxSizing: "border-box" }}>
+                    <option value="">Tất cả trạng thái</option>
+                    <option value="pending">Chờ duyệt</option>
+                    <option value="approved">Đã duyệt</option>
+                    <option value="rejected">Từ chối</option>
+                    <option value="pending_cancel">Chờ duyệt hủy</option>
+                    <option value="changed">Đã chỉnh sửa</option>
+                  </select>
+                </div>
+
+                {/* Lý do */}
+                <div>
+                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>Lý do nghỉ phép</label>
+                  <div style={{ position: "relative" }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={T.inkMuted} strokeWidth="2.2" strokeLinecap="round" style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+                      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input type="text" placeholder="Từ khóa lý do..." value={srchReason} onChange={e => setSrchReason(e.target.value)}
+                      style={{ width: "100%", padding: "7px 10px 7px 26px", borderRadius: T.rSm, border: `1.5px solid ${srchReason ? T.primary : T.border}`, fontSize: 12, fontFamily: T.fontB, color: T.ink, background: srchReason ? T.primarySoft : T.surface, boxSizing: "border-box", outline: "none" }}
+                    />
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* Result count */}
+            {hasSearchFilters && (
+              <div style={{ marginTop: 10, fontSize: 12 }}>
+                {filteredRequests.length === requests.length
+                  ? <span style={{ color: T.inkMuted }}>{requests.length} đơn</span>
+                  : <span>Hiển thị <b style={{ color: T.primary }}>{filteredRequests.length}</b> / {requests.length} đơn</span>
+                }
+              </div>
+            )}
           </div>
+
+          {/* ── Table ── */}
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: T.fontB }}>
               <thead><tr>
                 {["Mã đơn", "Nhân viên", "Phòng ban", "Loại", "Thời gian", "Số ngày", "Lý do", "Trạng thái", "Thao tác"].map(h => <TH key={h}>{h}</TH>)}
               </tr></thead>
               <tbody>
-                {requests.map((r, i) => {
-                  const st = stMap[r.status];
+                {filteredRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} style={{ textAlign: "center", padding: "40px 20px", color: T.inkMuted, fontSize: 13 }}>
+                      <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
+                      <div style={{ fontWeight: 600, color: T.ink, marginBottom: 4 }}>Không tìm thấy kết quả</div>
+                      <div style={{ fontSize: 12 }}>Thử thay đổi điều kiện tìm kiếm</div>
+                    </td>
+                  </tr>
+                ) : filteredRequests.map((r, i) => {
+                  const st = stMap[r.status] || { l: r.status, c: T.inkMuted, bg: T.surfaceAlt };
                   return (
                     <tr key={i} style={{ cursor: "pointer" }} onClick={() => setModal(r)}>
                       <TD mono style={{ color: T.primary, fontWeight: 600 }}>{r.id}</TD>
@@ -692,8 +878,8 @@ const LeavePage = ({ onNav }) => {
                       <TD>
                         {r.status === "pending" && (
                           <div style={{ display: "flex", gap: 4 }} onClick={e => e.stopPropagation()}>
-                            <Btn v="success" size="sm">Duyệt</Btn>
-                            <Btn v="danger" size="sm">Từ chối</Btn>
+                            <Btn v="success" size="sm" onClick={() => setRequests(prev => prev.map(x => x.id === r.id ? { ...x, status: "approved" } : x))}>Duyệt</Btn>
+                            <Btn v="danger"  size="sm" onClick={() => setRequests(prev => prev.map(x => x.id === r.id ? { ...x, status: "rejected" } : x))}>Từ chối</Btn>
                           </div>
                         )}
                       </TD>
@@ -703,8 +889,10 @@ const LeavePage = ({ onNav }) => {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderTop: `1px solid ${T.borderLight}`, fontSize: 12, color: T.inkMuted }}>
-            <span>Hiển thị 1-8 / 8 đơn</span>
+            <span>Hiển thị {Math.min(filteredRequests.length, 8)} / {filteredRequests.length} đơn</span>
             <div style={{ display: "flex", gap: 4 }}>
               {[1].map(p => <span key={p} style={{ padding: "4px 10px", borderRadius: T.rSm, background: T.primarySoft, color: T.primary, fontWeight: 700, cursor: "pointer" }}>{p}</span>)}
             </div>
@@ -2776,6 +2964,11 @@ const WorkflowPage = () => {
   const [filter, setFilter] = useState("Tất cả");
   const [detailReq, setDetailReq] = useState(null);
 
+  // ── Search states ─────────────────────────────────────────────
+  const [srchBy,   setSrchBy]   = useState("");  // tên người tạo
+  const [srchFrom, setSrchFrom] = useState("");  // YYYY-MM-DD
+  const [srchTo,   setSrchTo]   = useState("");  // YYYY-MM-DD
+
   const reqTypes = [
     { id: "wfh", icon: "🏠", label: "WFH (Làm từ xa)", desc: "Làm việc tại nhà hoặc ngoài văn phòng", color: T.primary },
     { id: "ot", icon: "⏰", label: "Làm thêm giờ (OT)", desc: "Đăng ký làm thêm ngoài giờ", color: T.accent },
@@ -2799,7 +2992,29 @@ const WorkflowPage = () => {
 
   const stM = { pending: { l: "Chờ duyệt", c: T.warning, bg: T.warningSoft }, approved: { l: "Đã duyệt", c: T.success, bg: T.successSoft }, completed: { l: "Hoàn tất", c: T.inkMuted, bg: T.surfaceAlt }, rejected: { l: "Từ chối", c: T.danger, bg: T.dangerSoft } };
 
-  const filteredReqs = filter === "Tất cả" ? reqs : reqs.filter(r => r.type === filter);
+  // Helper: parse "DD/MM" or "DD-DD/MM" → Date (first date) using 2026
+  const parseReqDate = (d = "") => {
+    const part = d.split("-")[0]; // handle "20-22/04" → "20"
+    const [day, mon] = part.split("/");
+    return new Date(`2026-${(mon||"01").padStart(2,"0")}-${(day||"01").padStart(2,"0")}`);
+  };
+
+  const filteredReqs = reqs.filter(r => {
+    if (filter !== "Tất cả" && r.type !== filter) return false;
+    if (srchBy && !r.by.toLowerCase().includes(srchBy.toLowerCase())) return false;
+    if (srchFrom) {
+      const d = parseReqDate(r.date);
+      if (!isNaN(d) && d < new Date(srchFrom)) return false;
+    }
+    if (srchTo) {
+      const d = parseReqDate(r.date);
+      if (!isNaN(d) && d > new Date(srchTo)) return false;
+    }
+    return true;
+  });
+
+  const hasSearch = srchBy || srchFrom || srchTo;
+  const clearSearch = () => { setSrchBy(""); setSrchFrom(""); setSrchTo(""); };
   const pendingCount = reqs.filter(r => r.st === "pending").length;
 
   return (
@@ -2816,16 +3031,100 @@ const WorkflowPage = () => {
         <StatCard label="Đã duyệt" value={reqs.filter(r=>r.st==="approved").length} icon={IC.check} color={T.success} bg={T.successSoft} />
       </div>
 
-      {/* Filter */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+      {/* Filter pills */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
         {["Tất cả", "WFH", "OT", "Công tác", "Đi muộn", "Xác nhận giấy tờ", "Thiết bị"].map(f => (
           <Btn key={f} v={filter === f ? "primary" : "secondary"} size="sm" onClick={() => setFilter(f)}>{f}</Btn>
         ))}
       </div>
 
+      {/* ── Search bar ── */}
+      <Card style={{ padding: "12px 16px", marginBottom: 12 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+
+          {/* Text search — tên người tạo */}
+          <div style={{ position: "relative", flex: "1 1 200px", minWidth: 160 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.inkMuted} strokeWidth="2.2" strokeLinecap="round"
+              style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}>
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              type="text"
+              placeholder="Tìm theo tên người tạo..."
+              value={srchBy}
+              onChange={e => setSrchBy(e.target.value)}
+              style={{
+                width: "100%", padding: "8px 28px 8px 32px", borderRadius: T.rSm,
+                border: `1.5px solid ${srchBy ? T.primary : T.border}`,
+                fontSize: 13, fontFamily: T.fontB, background: T.surface,
+                boxSizing: "border-box", outline: "none", color: T.ink,
+              }}
+            />
+            {srchBy && (
+              <button onClick={() => setSrchBy("")} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: T.inkMuted, fontSize: 14, lineHeight: 1, padding: 2 }}>✕</button>
+            )}
+          </div>
+
+          {/* From date */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: T.inkMuted, whiteSpace: "nowrap" }}>Từ</span>
+            <input
+              type="date"
+              value={srchFrom}
+              onChange={e => setSrchFrom(e.target.value)}
+              style={{
+                padding: "8px 10px", borderRadius: T.rSm,
+                border: `1.5px solid ${srchFrom ? T.primary : T.border}`,
+                fontSize: 13, fontFamily: T.fontB, color: T.ink,
+                background: srchFrom ? T.primarySoft : T.surface,
+                outline: "none", cursor: "pointer",
+              }}
+            />
+          </div>
+
+          {/* To date */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: T.inkMuted, whiteSpace: "nowrap" }}>Đến</span>
+            <input
+              type="date"
+              value={srchTo}
+              min={srchFrom || undefined}
+              onChange={e => setSrchTo(e.target.value)}
+              style={{
+                padding: "8px 10px", borderRadius: T.rSm,
+                border: `1.5px solid ${srchTo ? T.primary : T.border}`,
+                fontSize: 13, fontFamily: T.fontB, color: T.ink,
+                background: srchTo ? T.primarySoft : T.surface,
+                outline: "none", cursor: "pointer",
+              }}
+            />
+          </div>
+
+          {/* Clear + result count */}
+          {hasSearch && (
+            <>
+              <button onClick={clearSearch} style={{ padding: "8px 12px", borderRadius: T.rSm, border: "none", background: "none", color: T.danger, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
+                ✕ Xóa
+              </button>
+              <div style={{ fontSize: 12, color: filteredReqs.length === reqs.length ? T.inkMuted : T.primary, fontWeight: filteredReqs.length === reqs.length ? 400 : 600, marginLeft: 2 }}>
+                {filteredReqs.length === reqs.length
+                  ? `${reqs.length} yêu cầu`
+                  : `${filteredReqs.length} / ${reqs.length} yêu cầu`}
+              </div>
+            </>
+          )}
+        </div>
+      </Card>
+
       {/* Request List */}
       <Card style={{ padding: 0 }}>
-        {filteredReqs.map((r, i) => {
+        {filteredReqs.length === 0 ? (
+          <div style={{ padding: "48px 20px", textAlign: "center" }}>
+            <div style={{ fontSize: 32, marginBottom: 10 }}>🔍</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: T.ink, marginBottom: 4 }}>Không tìm thấy kết quả</div>
+            <div style={{ fontSize: 12, color: T.inkMuted }}>Thử thay đổi điều kiện tìm kiếm</div>
+          </div>
+        ) : filteredReqs.map((r, i) => {
           const st = stM[r.st];
           return (
             <div key={i} onClick={() => setDetailReq(r)} style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", borderTop: i ? `1px solid ${T.borderLight}` : "none", cursor: "pointer" }}>
