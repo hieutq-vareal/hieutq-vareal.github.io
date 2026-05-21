@@ -332,10 +332,16 @@ const Sidebar = ({ active, onNav, collapsed }) => {
       </div>
 
       <div style={{ padding: "12px", borderTop: `1px solid ${T.borderLight}` }}>
-        <div style={{
-          display: "flex", alignItems: "center", gap: 10, padding: "8px",
-          borderRadius: T.r, background: T.surfaceAlt, cursor: "pointer",
-        }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 8px 8px" }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Thông báo</span>
+          <div style={{ position: "relative", cursor: "pointer", padding: 4 }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={T.inkSoft} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            <span style={{ position: "absolute", top: 0, right: 0, width: 15, height: 15, borderRadius: "50%", background: T.danger, color: "white", fontSize: 9, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid white" }}>3</span>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px", borderRadius: T.r, background: T.surfaceAlt, cursor: "pointer" }}>
           <Avatar name="Trần Thị Ngọc" size={32} colors={[T.primary, T.primaryDark]} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: T.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Trần Thị Ngọc</div>
@@ -4534,6 +4540,39 @@ const SettingsPage = () => {
   const [editingMatrix, setEditingMatrix] = useState(false);
   const [wfSearch, setWfSearch] = useState("");
 
+  // ── Notification Management (System) ────────────────────────
+  const allMembers  = ["Nguyễn Văn An","Lê Thị Mai","Trần Đức Hùng","Phạm Minh Tuấn","Hoàng Thị Lan","Vũ Đức Minh","Đỗ Thị Hương","Bùi Quang Hải"];
+  const allDeptList = ["Engineering","Design","QA","HR","Kế toán","Ban lãnh đạo"];
+  const notifyStatusCfg = {
+    published: { l: "Published", c: T.success,  bg: T.successSoft },
+    draft:     { l: "Draft",     c: T.inkMuted, bg: T.surfaceAlt  },
+  };
+  const [sysNotifications, setSysNotifications] = useState([
+    { id: 1, title: "Lịch nghỉ lễ 30/4 - 1/5",         body: "Công ty nghỉ lễ từ 30/04 đến 02/05/2026.",           recipientType: "all",     recipients: [], depts: [],                              status: "published", author: "Trần Thị Ngọc",    createdAt: "20/04 09:00" },
+    { id: 2, title: "Cập nhật chính sách WFH Q2/2026",  body: "Kể từ 01/05, nhân viên được WFH tối đa 3 ngày/tuần.", recipientType: "all",     recipients: [], depts: [],                              status: "published", author: "Lê Ngọc Minh Thư", createdAt: "18/04 14:30" },
+    { id: 3, title: "Kế hoạch team building Q2",        body: "Team building tháng 5 tại Đà Lạt (23-25/05).",        recipientType: "dept",    recipients: [], depts: ["Engineering","Design","QA"],    status: "published", author: "Trần Thị Ngọc",    createdAt: "15/04 10:00" },
+    { id: 4, title: "Nhắc nhở nộp báo cáo KPI tháng 4",body: "Deadline nộp KPI tháng 4 là 05/05/2026.",             recipientType: "dept",    recipients: [], depts: ["Engineering"],                  status: "draft",     author: "Trần Thị Ngọc",    createdAt: "14/04 16:00" },
+    { id: 5, title: "Chúc mừng sinh nhật tháng 4",      body: "Chúc mừng sinh nhật các thành viên tháng 4!",         recipientType: "members", recipients: ["Lê Thị Mai","Vũ Đức Minh"], depts: [],  status: "published", author: "Lê Ngọc Minh Thư", createdAt: "01/04 08:00" },
+  ]);
+  const BLANK_NOTIFY = { title: "", body: "", recipientType: "all", recipients: [], depts: [], status: "draft", publishAt: "" };
+  const [notifyModal,        setNotifyModal]        = useState(null); // null | "create" | notify obj
+  const [notifyDraft,        setNotifyDraft]        = useState(BLANK_NOTIFY);
+  const [notifyMemberSearch, setNotifyMemberSearch] = useState("");
+
+  // ── Personal Inbox (Personal Settings > Notifications) ──────
+  const [inboxItems, setInboxItems] = useState([
+    { id: 1, title: "Lịch nghỉ lễ 30/4 - 1/5",                  body: "Công ty nghỉ lễ từ 30/04 đến 02/05/2026. Các bạn lưu ý sắp xếp công việc.",                  time: "20/04 09:00", read: false, author: "Trần Thị Ngọc"    },
+    { id: 2, title: "Đơn nghỉ phép LV-037 đã được duyệt",        body: "Đơn nghỉ phép từ 07/04 → 08/04 đã được phê duyệt bởi Trần Thị Ngọc.",                        time: "05/04 11:00", read: false, author: "Hệ thống"          },
+    { id: 3, title: "Cập nhật chính sách WFH Q2/2026",           body: "Kể từ 01/05, nhân viên được WFH tối đa 3 ngày/tuần thay vì 2 ngày như trước.",               time: "18/04 14:30", read: false, author: "Lê Ngọc Minh Thư"  },
+    { id: 4, title: "Nhắc nhở nộp KPI tháng 3",                  body: "Deadline nộp KPI tháng 3 là ngày mai 05/04. Vui lòng hoàn thành đúng hạn.",                   time: "04/04 09:00", read: true,  author: "Hệ thống"          },
+    { id: 5, title: "Phiếu lương tháng 3 đã sẵn sàng",           body: "Phiếu lương tháng 3/2026 của bạn đã được cập nhật. Vào mục Lương để xem chi tiết.",           time: "01/04 08:00", read: true,  author: "Hệ thống"          },
+  ]);
+  const [selectedNotif, setSelectedNotif] = useState(null);
+  const [notifView,     setNotifView]     = useState("inbox"); // "inbox" | "settings"
+  const unreadCount = inboxItems.filter(n => !n.read).length;
+  const markRead    = (id) => setInboxItems(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  const markAllRead = ()   => setInboxItems(prev => prev.map(n => ({ ...n, read: true })));
+
   // Create leave policy
   const BLANK_POLICY = { name: "", days: null, unit: "ngày/năm", paid: true, carry: false, maxCarry: 0, halfDay: false, probation: false, docs: false, docsDesc: "", color: T.primary, workflowId: null, workflowRules: [], seniorityBonus: "", seniorityRules: [], bonusDays: 0, bonusAvailableAfter: 0, desc: "" };
   const isAnnualLeave = (p) =>
@@ -4685,6 +4724,7 @@ const SettingsPage = () => {
     { id: "leave",    label: "Chính sách phép",     icon: "📋" },
     { id: "approval", label: "Approval Workflow",   icon: "✅" },
     { id: "roles",    label: "Roles & Permissions", icon: "🔐" },
+    { id: "notify",   label: "Notification",        icon: "🔔" },
   ];
   const personalTabs = [
     { id: "profile",       label: "My Profile",     icon: "👤" },
@@ -4977,39 +5017,87 @@ const SettingsPage = () => {
           </>)}
 
           {/* ──────────────── NOTIFICATIONS ──────────────── */}
-          {effectiveTab === "notifications" && (<>
-            <Card>
-              <div style={{ marginBottom: 20 }}>
-                <h3 style={{ fontFamily: T.fontD, fontSize: 16, fontWeight: 700, margin: "0 0 4px" }}>Notifications</h3>
-                <p style={{ fontSize: 12, color: T.inkMuted, margin: 0 }}>Tùy chỉnh cách nhận thông báo cho từng loại sự kiện</p>
-              </div>
-
-              {/* Legend */}
-              <div style={{ display: "flex", gap: 16, padding: "10px 16px", background: T.surfaceAlt, borderRadius: T.rSm, marginBottom: 16 }}>
+          {effectiveTab === "notifications" && (
+            <>
+              {/* Sub-tabs */}
+              <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
                 {[
-                  { v: "none",    label: "Tắt — không nhận thông báo",          color: T.inkMuted },
-                  { v: "private", label: "Riêng tư — chỉ tiêu đề, ẩn nội dung", color: "#D97706" },
-                  { v: "full",    label: "Đầy đủ — hiển thị toàn bộ nội dung",  color: T.success },
-                ].map(o => (
-                  <div key={o.v} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: o.color }} />
-                    <span style={{ fontSize: 11, color: T.inkSoft }}>{o.label}</span>
-                  </div>
+                  { v: "inbox",    label: "Hộp thư"             },
+                  { v: "settings", label: "Cài đặt thông báo"   },
+                ].map(t => (
+                  <button key={t.v} onClick={() => setNotifView(t.v)}
+                    style={{ display:"flex",alignItems:"center",gap:6,padding:"7px 16px",borderRadius:T.rFull,fontSize:12,fontWeight:600,cursor:"pointer",border:`1.5px solid ${notifView===t.v?T.primary:T.border}`,background:notifView===t.v?T.primarySoft:T.surface,color:notifView===t.v?T.primary:T.inkSoft,transition:"all 0.12s" }}>
+                    {t.v==="inbox" && unreadCount>0
+                      ? <><span>Hộp thư</span><span style={{padding:"1px 7px",borderRadius:T.rFull,background:T.primary,color:"white",fontSize:10,fontWeight:800}}>{unreadCount}</span></>
+                      : t.label}
+                  </button>
                 ))}
+                {notifView==="inbox" && unreadCount>0 && (
+                  <button onClick={markAllRead} style={{ marginLeft:"auto",padding:"7px 14px",borderRadius:T.rFull,fontSize:12,fontWeight:600,cursor:"pointer",border:"none",background:"none",color:T.primary }}>
+                    ✓ Đánh dấu tất cả đã đọc
+                  </button>
+                )}
               </div>
 
-              <NotifRow k="leaveApproval"    icon="🗓" label="Duyệt nghỉ phép"      desc="Thông báo khi đơn nghỉ phép được duyệt hoặc từ chối" />
-              <NotifRow k="kpiReminder"       icon="📊" label="Nhắc nhở KPI"         desc="Nhắc khi đến hạn nộp KPI hoặc có cập nhật đánh giá" />
-              <NotifRow k="payslip"           icon="💰" label="Phiếu lương"           desc="Thông báo khi phiếu lương tháng được phát hành" />
-              <NotifRow k="overtimeRequest"   icon="⏰" label="Yêu cầu OT / WFH"     desc="Thông báo trạng thái các yêu cầu làm thêm giờ, WFH" />
-              <NotifRow k="birthdayReminder"  icon="🎂" label="Sinh nhật đồng nghiệp" desc="Nhắc nhở sinh nhật các thành viên trong tổ chức" />
-              <NotifRow k="systemAlert"       icon="🔔" label="Thông báo hệ thống"    desc="Bảo trì, cập nhật tính năng và cảnh báo hệ thống" />
-
-              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 16 }}>
-                <Btn><Ico d={IC.check} size={14} /> Lưu cài đặt</Btn>
-              </div>
-            </Card>
-          </>)}
+              {notifView === "inbox" ? (
+                <Card style={{ padding: 0, overflow: "hidden" }}>
+                  {inboxItems.length === 0 ? (
+                    <div style={{ padding:"48px 20px",textAlign:"center" }}>
+                      <div style={{ fontSize:36,marginBottom:10 }}>🔔</div>
+                      <div style={{ fontSize:14,fontWeight:600,color:T.ink }}>Không có thông báo nào</div>
+                    </div>
+                  ) : inboxItems.map((n, i) => (
+                    <div key={n.id}
+                      onClick={() => { setSelectedNotif(selectedNotif?.id===n.id ? null : n); markRead(n.id); }}
+                      style={{ padding:"14px 18px",borderBottom:i<inboxItems.length-1?`1px solid ${T.borderLight}`:"none",cursor:"pointer",background:!n.read?`${T.primary}06`:"white",transition:"background 0.12s" }}>
+                      <div style={{ display:"flex",alignItems:"flex-start",gap:12 }}>
+                        {/* Unread dot */}
+                        <div style={{ width:8,height:8,borderRadius:"50%",background:!n.read?T.primary:"transparent",flexShrink:0,marginTop:5 }} />
+                        <div style={{ flex:1,minWidth:0 }}>
+                          <div style={{ display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:8,marginBottom:3 }}>
+                            <div style={{ fontSize:13,fontWeight:!n.read?700:500,color:T.ink }}>{n.title}</div>
+                            <div style={{ fontSize:10,color:T.inkMuted,whiteSpace:"nowrap",flexShrink:0 }}>{n.time}</div>
+                          </div>
+                          <div style={{ fontSize:12,color:T.inkMuted }}>{n.body}</div>
+                          {selectedNotif?.id===n.id && (
+                            <div style={{ marginTop:10,padding:"10px 14px",background:T.surfaceAlt,borderRadius:T.rSm,fontSize:12,color:T.inkSoft }}>
+                              <div style={{ fontWeight:700,color:T.ink,marginBottom:4 }}>{n.title}</div>
+                              <div style={{ color:T.ink,lineHeight:1.6 }}>{n.body}</div>
+                              <div style={{ marginTop:6,fontSize:11,color:T.inkMuted }}>Từ: {n.author} · {n.time}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </Card>
+              ) : (
+                <Card>
+                  <div style={{ marginBottom:20 }}>
+                    <h3 style={{ fontFamily:T.fontD,fontSize:16,fontWeight:700,margin:"0 0 4px" }}>Cài đặt thông báo</h3>
+                    <p style={{ fontSize:12,color:T.inkMuted,margin:0 }}>Tùy chỉnh cách nhận thông báo cho từng loại sự kiện</p>
+                  </div>
+                  <div style={{ display:"flex",gap:16,padding:"10px 16px",background:T.surfaceAlt,borderRadius:T.rSm,marginBottom:16 }}>
+                    {[{v:"none",label:"Tắt",color:T.inkMuted},{v:"private",label:"Riêng tư",color:"#D97706"},{v:"full",label:"Đầy đủ",color:T.success}].map(o=>(
+                      <div key={o.v} style={{ display:"flex",alignItems:"center",gap:5 }}>
+                        <div style={{ width:8,height:8,borderRadius:"50%",background:o.color }} />
+                        <span style={{ fontSize:11,color:T.inkSoft }}>{o.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <NotifRow k="leaveApproval"   icon="🗓" label="Duyệt nghỉ phép"      desc="Khi đơn nghỉ phép được duyệt hoặc từ chối" />
+                  <NotifRow k="kpiReminder"      icon="📊" label="Nhắc nhở KPI"         desc="Khi đến hạn nộp KPI hoặc có cập nhật đánh giá" />
+                  <NotifRow k="payslip"          icon="💰" label="Phiếu lương"           desc="Khi phiếu lương tháng được phát hành" />
+                  <NotifRow k="overtimeRequest"  icon="⏰" label="Yêu cầu OT / WFH"     desc="Trạng thái các yêu cầu làm thêm giờ, WFH" />
+                  <NotifRow k="birthdayReminder" icon="🎂" label="Sinh nhật đồng nghiệp" desc="Nhắc sinh nhật các thành viên trong tổ chức" />
+                  <NotifRow k="systemAlert"      icon="🔔" label="Thông báo hệ thống"    desc="Bảo trì, cập nhật tính năng và cảnh báo" />
+                  <div style={{ display:"flex",justifyContent:"flex-end",marginTop:16 }}>
+                    <Btn><Ico d={IC.check} size={14} /> Lưu cài đặt</Btn>
+                  </div>
+                </Card>
+              )}
+            </>
+          )}
 
           {/* ──────────────── APPEARANCE ──────────────── */}
           {effectiveTab === "appearance" && (<>
@@ -6186,6 +6274,204 @@ const SettingsPage = () => {
                       >
                         <Ico d={IC.check} size={14} /> Tạo chính sách
                       </Btn>
+                    </div>
+                  </div>
+                </Modal>
+              )}
+            </>
+          )}
+
+          {/* ──────────────── NOTIFICATION MANAGEMENT ──────────────── */}
+          {effectiveTab === "notify" && isAdmin && (
+            <>
+              {/* Stats */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 }}>
+                {[
+                  { label: "Tổng thông báo", value: sysNotifications.length,                                    color: T.primary,  bg: T.primarySoft },
+                  { label: "Published",       value: sysNotifications.filter(n => n.status==="published").length, color: T.success,  bg: T.successSoft },
+                  { label: "Draft",           value: sysNotifications.filter(n => n.status==="draft").length,     color: T.inkMuted, bg: T.surfaceAlt  },
+                ].map((s, i) => (
+                  <Card key={i} style={{ padding: "14px 16px" }}>
+                    <div style={{ fontSize: 24, fontWeight: 800, fontFamily: T.fontD, color: s.color }}>{s.value}</div>
+                    <div style={{ fontSize: 11, color: T.inkMuted, marginTop: 2 }}>{s.label}</div>
+                  </Card>
+                ))}
+              </div>
+
+              {/* List */}
+              <Card style={{ padding: 0, overflow: "hidden" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: `1px solid ${T.borderLight}` }}>
+                  <div>
+                    <h3 style={{ fontFamily: T.fontD, fontSize: 15, fontWeight: 700, margin: "0 0 2px" }}>Danh sách thông báo</h3>
+                    <div style={{ fontSize: 12, color: T.inkMuted }}>Quản lý thông báo nội bộ gửi đến nhân viên</div>
+                  </div>
+                  <Btn size="sm" onClick={() => { setNotifyDraft(BLANK_NOTIFY); setNotifyMemberSearch(""); setNotifyModal("create"); }}>
+                    <Ico d={IC.add} size={14} /> Tạo thông báo
+                  </Btn>
+                </div>
+                {/* Table header */}
+                <div style={{ display: "grid", gridTemplateColumns: "2fr 3fr 1.4fr 1fr 1.2fr 72px", background: T.surfaceAlt, borderBottom: `1px solid ${T.border}`, padding: "8px 20px", gap: 10 }}>
+                  {["Tiêu đề", "Đối tượng nhận", "Người tạo", "Trạng thái", "Thời gian", ""].map((h, i) => (
+                    <div key={i} style={{ fontSize: 10, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</div>
+                  ))}
+                </div>
+                {sysNotifications.map((n, i) => {
+                  const sc = notifyStatusCfg[n.status] || { l: n.status, c: T.inkMuted, bg: T.surfaceAlt };
+                  return (
+                    <div key={n.id} style={{ display: "grid", gridTemplateColumns: "2fr 3fr 1.4fr 1fr 1.2fr 72px", padding: "12px 20px", gap: 10, borderBottom: i < sysNotifications.length - 1 ? `1px solid ${T.borderLight}` : "none", alignItems: "center", background: i%2===0?"white":T.surfaceAlt }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: T.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.title}</div>
+                        <div style={{ fontSize: 11, color: T.inkMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 2 }}>{n.body}</div>
+                      </div>
+                      <div style={{ fontSize: 11, color: T.inkSoft, display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
+                        {n.recipientType === "all"     && <><span>🌐</span><span>Toàn thể nhân viên</span></>}
+                        {n.recipientType === "dept"    && <><span>🏬</span>{(n.depts||[]).map(d=><span key={d} style={{padding:"1px 6px",background:T.primarySoft,color:T.primary,borderRadius:T.rFull,fontSize:10,fontWeight:600}}>{d}</span>)}</>}
+                        {n.recipientType === "members" && <><span>👥</span><span>{(n.recipients||[]).length} người</span></>}
+                      </div>
+                      <div style={{ fontSize: 12, color: T.inkSoft }}>{n.author}</div>
+                      <div><Badge color={sc.c} bg={sc.bg}>{sc.l}</Badge></div>
+                      <div style={{ fontSize: 11, color: T.inkMuted }}>{n.createdAt}</div>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <Btn v="ghost" size="sm" onClick={() => { setNotifyDraft({ ...n }); setNotifyMemberSearch(""); setNotifyModal(n); }}>
+                          <Ico d={IC.edit} size={13} />
+                        </Btn>
+                        <Btn v="ghost" size="sm" onClick={() => setSysNotifications(prev => prev.filter(x => x.id !== n.id))}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.danger} strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                        </Btn>
+                      </div>
+                    </div>
+                  );
+                })}
+              </Card>
+
+              {/* Create / Edit Modal */}
+              {notifyModal && (
+                <Modal
+                  title={notifyModal === "create" ? "Tạo thông báo mới" : `Chỉnh sửa: ${notifyDraft.title}`}
+                  onClose={() => { setNotifyModal(null); setNotifyMemberSearch(""); }}
+                  width={580}
+                >
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    <Input label="Tiêu đề thông báo *" placeholder="VD: Thông báo nghỉ lễ 30/4" value={notifyDraft.title} onChange={e => setNotifyDraft(p => ({ ...p, title: e.target.value }))} />
+                    <div>
+                      <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Nội dung thông báo *</label>
+                      <textarea rows={4} value={notifyDraft.body} onChange={e => setNotifyDraft(p => ({ ...p, body: e.target.value }))}
+                        placeholder="Nhập nội dung thông báo..."
+                        style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, resize: "vertical", boxSizing: "border-box" }} />
+                    </div>
+
+                    {/* Recipient type */}
+                    <div style={{ borderTop: `1px dashed ${T.border}`, paddingTop: 14 }}>
+                      <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: T.inkSoft, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10 }}>Đối tượng nhận thông báo</label>
+                      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                        {[
+                          { v: "all",     icon: "🌐", l: "All Employees"    },
+                          { v: "dept",    icon: "🏬", l: "Departments"      },
+                          { v: "members", icon: "👥", l: "Selected Members" },
+                        ].map(opt => (
+                          <div key={opt.v} onClick={() => setNotifyDraft(p => ({ ...p, recipientType: opt.v }))}
+                            style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "10px 8px", borderRadius: T.r, cursor: "pointer", border: `2px solid ${notifyDraft.recipientType===opt.v?T.primary:T.border}`, background: notifyDraft.recipientType===opt.v?T.primarySoft:T.surface, transition: "all 0.13s" }}>
+                            <span style={{ fontSize: 20 }}>{opt.icon}</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: notifyDraft.recipientType===opt.v?T.primary:T.inkSoft, textAlign: "center" }}>{opt.l}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {notifyDraft.recipientType === "all" && (
+                        <div style={{ padding: "10px 14px", background: T.primarySoft, borderRadius: T.rSm, fontSize: 12, color: T.primary, fontWeight: 600 }}>
+                          🌐 Thông báo sẽ được gửi đến toàn bộ nhân viên công ty.
+                        </div>
+                      )}
+
+                      {notifyDraft.recipientType === "dept" && (
+                        <div>
+                          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 8 }}>Chọn phòng ban</label>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                            {allDeptList.map(d => {
+                              const isSel = (notifyDraft.depts||[]).includes(d);
+                              return (
+                                <button key={d} onClick={() => setNotifyDraft(p => ({ ...p, depts: isSel ? p.depts.filter(x=>x!==d) : [...(p.depts||[]),d] }))}
+                                  style={{ padding: "5px 12px", borderRadius: T.rFull, fontSize: 12, fontWeight: 600, cursor: "pointer", border: `1.5px solid ${isSel?T.primary:T.border}`, background: isSel?T.primarySoft:T.surface, color: isSel?T.primary:T.inkSoft }}>
+                                  {isSel && "✓ "}{d}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {(notifyDraft.depts||[]).length > 0 && (
+                            <div style={{ marginTop: 8, fontSize: 11, color: T.inkMuted }}>Đã chọn: <b>{(notifyDraft.depts||[]).join(", ")}</b></div>
+                          )}
+                        </div>
+                      )}
+
+                      {notifyDraft.recipientType === "members" && (
+                        <div>
+                          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 8 }}>Chọn thành viên</label>
+                          <div style={{ position: "relative", marginBottom: 8 }}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.inkMuted} strokeWidth="2.2" strokeLinecap="round" style={{ position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",pointerEvents:"none" }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input type="text" placeholder="Tìm tên nhân viên..." value={notifyMemberSearch} onChange={e => setNotifyMemberSearch(e.target.value)}
+                              style={{ width:"100%",padding:"8px 10px 8px 30px",borderRadius:T.rSm,border:`1px solid ${T.border}`,fontSize:12,fontFamily:T.fontB,boxSizing:"border-box",outline:"none" }} />
+                          </div>
+                          <div style={{ border:`1px solid ${T.border}`,borderRadius:T.rSm,maxHeight:160,overflowY:"auto" }}>
+                            {allMembers.filter(m => !notifyMemberSearch||m.toLowerCase().includes(notifyMemberSearch.toLowerCase())).map((m, mi, arr) => {
+                              const isSel = (notifyDraft.recipients||[]).includes(m);
+                              return (
+                                <div key={m} onClick={() => setNotifyDraft(p=>({...p,recipients:isSel?p.recipients.filter(x=>x!==m):[...(p.recipients||[]),m]}))}
+                                  style={{ display:"flex",alignItems:"center",gap:10,padding:"8px 12px",cursor:"pointer",borderBottom:mi<arr.length-1?`1px solid ${T.borderLight}`:"none",background:isSel?T.primarySoft:"white" }}>
+                                  <div style={{ width:14,height:14,borderRadius:3,border:`2px solid ${isSel?T.primary:T.border}`,background:isSel?T.primary:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                                    {isSel && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                                  </div>
+                                  <Avatar name={m} size={22} />
+                                  <span style={{ fontSize:13,fontWeight:isSel?600:400,color:isSel?T.primary:T.ink }}>{m}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {(notifyDraft.recipients||[]).length > 0 && (
+                            <div style={{ marginTop:8,display:"flex",flexWrap:"wrap",gap:5 }}>
+                              {(notifyDraft.recipients||[]).map(m => (
+                                <span key={m} style={{ display:"flex",alignItems:"center",gap:4,padding:"3px 8px",borderRadius:T.rFull,background:T.primarySoft,border:`1px solid ${T.primary}30`,fontSize:11,fontWeight:600,color:T.primary }}>
+                                  {m}<span style={{cursor:"pointer",marginLeft:2}} onClick={()=>setNotifyDraft(p=>({...p,recipients:p.recipients.filter(x=>x!==m)}))}>✕</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <div>
+                        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Thời gian publish</label>
+                        <input type="datetime-local" value={notifyDraft.publishAt||""} onChange={e=>setNotifyDraft(p=>({...p,publishAt:e.target.value}))}
+                          style={{ width:"100%",padding:"9px 12px",borderRadius:T.rSm,border:`1px solid ${T.border}`,fontSize:13,fontFamily:T.fontB,boxSizing:"border-box" }} />
+                        <div style={{ fontSize:10,color:T.inkMuted,marginTop:3 }}>Để trống = publish ngay</div>
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Trạng thái</label>
+                        <select value={notifyDraft.status} onChange={e=>setNotifyDraft(p=>({...p,status:e.target.value}))}
+                          style={{ width:"100%",padding:"9px 12px",borderRadius:T.rSm,border:`1px solid ${T.border}`,fontSize:13,fontFamily:T.fontB }}>
+                          <option value="draft">Draft</option>
+                          <option value="published">Published</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display:"flex",gap:10,justifyContent:"flex-end",paddingTop:4,borderTop:`1px solid ${T.borderLight}` }}>
+                      <Btn v="secondary" onClick={() => { setNotifyModal(null); setNotifyMemberSearch(""); }}>Hủy</Btn>
+                      {notifyModal === "create" ? (
+                        <Btn onClick={() => {
+                          if (!notifyDraft.title.trim()) return;
+                          const now = new Date().toLocaleString("vi-VN",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+                          setSysNotifications(prev => [{ ...notifyDraft, id: Date.now(), author: "Trần Thị Ngọc", createdAt: now }, ...prev]);
+                          setNotifyModal(null); setNotifyMemberSearch("");
+                        }}><Ico d={IC.check} size={14} /> Tạo thông báo</Btn>
+                      ) : (
+                        <Btn onClick={() => {
+                          if (!notifyDraft.title.trim()) return;
+                          setSysNotifications(prev => prev.map(n => n.id===notifyDraft.id ? { ...notifyDraft } : n));
+                          setNotifyModal(null); setNotifyMemberSearch("");
+                        }}><Ico d={IC.check} size={14} /> Lưu thay đổi</Btn>
+                      )}
                     </div>
                   </div>
                 </Modal>
