@@ -139,6 +139,7 @@ const IC = {
   star: "M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z",
   up: "M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z",
   dn: "M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z",
+  remote: "M20 3H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h3l-1 1v2h12v-2l-1-1h3c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 11H4V5h16v9zm-8 7c-.83 0-1.5-.67-1.5-1.5h3c0 .83-.67 1.5-1.5 1.5z",
 };
 
 const Avatar = ({ name, size = 36, colors }) => {
@@ -266,6 +267,7 @@ const Sidebar = ({ active, onNav, collapsed }) => {
     { id: "employee", icon: IC.people, label: "Nhân sự" },
     { id: "orgchart", icon: IC.org, label: "Sơ đồ tổ chức" },
     { id: "leave", icon: IC.cal, label: "Nghỉ phép", badge: 3 },
+    { id: "workschedule", icon: IC.remote, label: "Lịch làm việc" },
     { id: "attendance", icon: IC.clock, label: "Chấm công" },
     { id: "kpi", icon: IC.kpi, label: "KPI & Đánh giá", section: "HIỆU SUẤT" },
     { id: "skill", icon: IC.skill, label: "Năng lực" },
@@ -6697,6 +6699,440 @@ const SettingsPage = () => {
   );
 };
 
+// ─── WORK SCHEDULE PAGE ──────────────────────────────────────────────────────
+const WorkSchedulePage = () => {
+  const today    = new Date();
+  const [month,  setMonth]  = useState(today.getMonth());
+  const [year,   setYear]   = useState(today.getFullYear());
+  const [role,   setRole]   = useState("admin");
+  const [deptF,  setDeptF]  = useState("Tất cả");
+  const [stF,    setStF]    = useState("all");
+  const [nameQ,  setNameQ]  = useState("");
+  const [history,setHistory]= useState([]);
+
+  const MONTHS = ["Tháng 1","Tháng 2","Tháng 3","Tháng 4","Tháng 5","Tháng 6","Tháng 7","Tháng 8","Tháng 9","Tháng 10","Tháng 11","Tháng 12"];
+  const DNAMES = ["CN","T2","T3","T4","T5","T6","T7"];
+  const DEPTS  = ["Tất cả","Engineering","Design","QA","HR","Kế toán"];
+  const APPROVERS = ["Trần Thị Ngọc","Đinh Trọng Hưng","Lê Ngọc Minh Thư"];
+  const DEPT_COLOR = { Engineering: T.primary, Design: "#7C3AED", QA: "#0891B2", HR: T.accent, "Kế toán": T.success };
+
+  const getDays = (y, m) => {
+    const arr = []; const d = new Date(y, m, 1);
+    while (d.getMonth() === m) { arr.push(new Date(d)); d.setDate(d.getDate()+1); }
+    return arr;
+  };
+
+  const mkSched = (seed, days) => {
+    const s = {};
+    days.forEach((d, i) => {
+      const dw = d.getDay();
+      if (dw===0||dw===6) { s[i]=""; return; }
+      s[i] = ((seed*7+i)%3===0) ? "R" : "O";
+    });
+    return s;
+  };
+
+  const days = React.useMemo(() => getDays(year, month), [year, month]);
+
+  const [emps, setEmps] = useState([
+    { id:1, name:"Nguyễn Văn An",   dept:"Engineering", approver:APPROVERS[1], status:"none",     role:"member"   },
+    { id:2, name:"Lê Thị Mai",      dept:"Design",      approver:APPROVERS[0], status:"approved", role:"member"   },
+    { id:3, name:"Trần Đức Hùng",   dept:"Engineering", approver:APPROVERS[1], status:"pending",  role:"member"   },
+    { id:4, name:"Phạm Minh Tuấn",  dept:"QA",          approver:APPROVERS[0], status:"none",     role:"member"   },
+    { id:5, name:"Hoàng Thị Lan",   dept:"Design",      approver:APPROVERS[0], status:"rejected", role:"member"   },
+    { id:6, name:"Vũ Đức Minh",     dept:"Engineering", approver:APPROVERS[1], status:"pending",  role:"member"   },
+    { id:7, name:"Đinh Trọng Hưng", dept:"Engineering", approver:APPROVERS[0], status:"approved", role:"approver" },
+  ]);
+
+  // Regenerate schedules when month/year change
+  React.useEffect(() => {
+    const d = getDays(year, month);
+    setEmps(prev => prev.map(e => ({ ...e, schedule: mkSched(e.id + year*12 + month, d) })));
+  }, [year, month]);
+
+  React.useEffect(() => {
+    setEmps(prev => prev.map(e => ({ ...e, schedule: mkSched(e.id, days) })));
+  }, []);
+
+  const filtered = React.useMemo(() => {
+    let list = emps;
+    if (role==="member")   list = list.filter(e => e.name==="Nguyễn Văn An");
+    if (role==="approver") list = list.filter(e => e.approver==="Đinh Trọng Hưng" || e.name==="Đinh Trọng Hưng");
+    if (deptF!=="Tất cả") list = list.filter(e => e.dept===deptF);
+    if (stF!=="all")       list = list.filter(e => e.status===stF);
+    if (nameQ) list = list.filter(e => e.name.toLowerCase().includes(nameQ.toLowerCase()));
+    return list;
+  }, [emps, role, deptF, stF, nameQ]);
+
+  const ST_CFG = {
+    none:     { l:"Chưa gửi",    c:T.inkMuted, bg:T.surfaceAlt  },
+    pending:  { l:"Chờ duyệt",   c:T.warning,  bg:T.warningSoft },
+    approved: { l:"Đã duyệt",    c:T.success,  bg:T.successSoft },
+    rejected: { l:"Từ chối",     c:T.danger,   bg:T.dangerSoft  },
+  };
+
+  const toggle = (empId, dayIdx) => {
+    setEmps(prev => prev.map(e => {
+      if (e.id!==empId || e.status==="pending"||e.status==="approved") return e;
+      const cur = e.schedule?.[dayIdx] || "O";
+      const nxt = cur==="R"?"O":"R";
+      setHistory(h => [...h.slice(-29), {empId, dayIdx, prev: cur}]);
+      return { ...e, schedule: { ...e.schedule, [dayIdx]: nxt } };
+    }));
+  };
+
+  const undo = () => {
+    if (!history.length) return;
+    const last = history[history.length-1];
+    setHistory(h => h.slice(0,-1));
+    setEmps(prev => prev.map(e => e.id!==last.empId ? e : { ...e, schedule: { ...e.schedule, [last.dayIdx]: last.prev } }));
+  };
+
+  const submit    = id => setEmps(prev => prev.map(e => e.id!==id ? e : { ...e, status:"pending" }));
+  const decide    = (id, v) => setEmps(prev => prev.map(e => e.id!==id ? e : { ...e, status:v }));
+  const bulkDecide= v => setEmps(prev => prev.map(e => e.status==="pending" ? { ...e, status:v } : e));
+
+  const applyWeekR = (empId, ws) =>
+    setEmps(prev => prev.map(e => {
+      if (e.id!==empId || e.status==="pending"||e.status==="approved") return e;
+      const ns = { ...e.schedule };
+      for (let i=ws; i<Math.min(ws+7, days.length); i++)
+        if (days[i].getDay()!==0 && days[i].getDay()!==6) ns[i]="R";
+      return { ...e, schedule: ns };
+    }));
+
+  const resetOffice = empId =>
+    setEmps(prev => prev.map(e => e.id!==empId ? e : {
+      ...e, schedule: Object.fromEntries(days.map((_,i) => [i, days[i].getDay()===0||days[i].getDay()===6?"":"O"]))
+    }));
+
+  const stats = id => {
+    const e = emps.find(x => x.id===id); if (!e?.schedule) return {r:0,o:0,pct:0};
+    const r = Object.values(e.schedule).filter(v=>v==="R").length;
+    const wd = days.filter(d=>d.getDay()!==0&&d.getDay()!==6).length;
+    return { r, o: wd-r, pct: wd?Math.round(r/wd*100):0 };
+  };
+
+  const canEdit = (e) => (role==="member"&&e.name==="Nguyễn Văn An"||role==="admin") && e.status!=="pending"&&e.status!=="approved";
+
+  const navMonth = dir => {
+    const d = new Date(year, month+dir);
+    setMonth(d.getMonth()); setYear(d.getFullYear());
+  };
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", minHeight:"100vh", background:T.bg, fontFamily:T.fontB }}>
+      {/* ── TopBar ── */}
+      <div style={{ background:T.surface, borderBottom:`1px solid ${T.border}`, padding:"0 28px", flexShrink:0 }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", height:60, gap:16 }}>
+          <div>
+            <div style={{ fontFamily:T.fontD, fontWeight:800, fontSize:18, color:T.ink }}>Lịch làm việc</div>
+            <div style={{ fontSize:11, color:T.inkMuted }}>Tổng quan · Lịch làm việc</div>
+          </div>
+
+          {/* Month picker */}
+          <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <button onClick={()=>navMonth(-1)} style={{ width:30,height:30,borderRadius:T.r,border:`1px solid ${T.border}`,background:T.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center" }}>
+              <Ico d={IC.chevR} size={18} color={T.inkSoft} style={{ transform:"scaleX(-1)" }} />
+            </button>
+            <div style={{ display:"flex", gap:6 }}>
+              <select value={month} onChange={e=>setMonth(+e.target.value)}
+                style={{ padding:"6px 10px",borderRadius:T.rSm,border:`1px solid ${T.border}`,fontSize:13,fontWeight:600,fontFamily:T.fontB,color:T.ink,background:T.surface,cursor:"pointer",outline:"none" }}>
+                {MONTHS.map((m,i) => <option key={i} value={i}>{m}</option>)}
+              </select>
+              <select value={year} onChange={e=>setYear(+e.target.value)}
+                style={{ padding:"6px 10px",borderRadius:T.rSm,border:`1px solid ${T.border}`,fontSize:13,fontWeight:600,fontFamily:T.fontB,color:T.ink,background:T.surface,cursor:"pointer",outline:"none" }}>
+                {[2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+            <button onClick={()=>{setMonth(today.getMonth());setYear(today.getFullYear());}} style={{ width:30,height:30,borderRadius:T.r,border:`1px solid ${T.border}`,background:T.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.inkSoft} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </button>
+          </div>
+
+          {/* Demo role switcher */}
+          <div style={{ display:"flex", gap:0, background:T.surfaceAlt, borderRadius:T.r, padding:3, border:`1px solid ${T.border}` }}>
+            {[["member","👤 Nhân viên"],["approver","✅ Approver"],["admin","🛡 Admin"]].map(([v,l]) => (
+              <button key={v} onClick={()=>setRole(v)} style={{ padding:"5px 12px",borderRadius:T.rSm,border:"none",cursor:"pointer",fontSize:11,fontWeight:600,fontFamily:T.fontB,transition:"all 0.12s",background:role===v?T.surface:T.surfaceAlt,color:role===v?T.primary:T.inkMuted,boxShadow:role===v?"0 1px 3px rgba(0,0,0,0.08)":"none" }}>
+                {l}
+              </button>
+            ))}
+          </div>
+
+          {/* Actions */}
+          <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+            {history.length>0 && (
+              <Btn v="ghost" size="sm" onClick={undo}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+                Hoàn tác ({history.length})
+              </Btn>
+            )}
+            {(role==="approver"||role==="admin") && emps.some(e=>e.status==="pending") && (
+              <>
+                <Btn v="success" size="sm" onClick={()=>bulkDecide("approved")} style={{ gap:4 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Duyệt tất cả
+                </Btn>
+                <Btn v="danger" size="sm" onClick={()=>bulkDecide("rejected")} style={{ gap:4 }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  Từ chối tất cả
+                </Btn>
+              </>
+            )}
+            <Btn v="secondary" size="sm">
+              <Ico d={IC.download} size={14} /> Xuất Excel
+            </Btn>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Filters (admin) ── */}
+      {role==="admin" && (
+        <div style={{ background:T.surface, borderBottom:`1px solid ${T.border}`, padding:"10px 28px", display:"flex", gap:10, alignItems:"center", flexShrink:0 }}>
+          <div style={{ position:"relative" }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.inkMuted} strokeWidth="2.2" strokeLinecap="round" style={{position:"absolute",left:9,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" placeholder="Tìm nhân viên..." value={nameQ} onChange={e=>setNameQ(e.target.value)}
+              style={{padding:"7px 10px 7px 28px",borderRadius:T.rSm,border:`1px solid ${nameQ?T.primary:T.border}`,fontSize:12,fontFamily:T.fontB,width:180,outline:"none",background:nameQ?T.primarySoft:T.surface}} />
+          </div>
+          <select value={deptF} onChange={e=>setDeptF(e.target.value)}
+            style={{padding:"7px 10px",borderRadius:T.rSm,border:`1px solid ${deptF!=="Tất cả"?T.primary:T.border}`,fontSize:12,fontFamily:T.fontB,color:T.ink,background:deptF!=="Tất cả"?T.primarySoft:T.surface,cursor:"pointer",outline:"none"}}>
+            {DEPTS.map(d => <option key={d}>{d}</option>)}
+          </select>
+          <select value={stF} onChange={e=>setStF(e.target.value)}
+            style={{padding:"7px 10px",borderRadius:T.rSm,border:`1px solid ${stF!=="all"?T.primary:T.border}`,fontSize:12,fontFamily:T.fontB,color:T.ink,background:stF!=="all"?T.primarySoft:T.surface,cursor:"pointer",outline:"none"}}>
+            <option value="all">Tất cả trạng thái</option>
+            <option value="none">Chưa gửi</option>
+            <option value="pending">Chờ duyệt</option>
+            <option value="approved">Đã duyệt</option>
+            <option value="rejected">Từ chối</option>
+          </select>
+          <span style={{fontSize:12,color:T.inkMuted}}>{filtered.length} nhân viên</span>
+
+          {/* Legend */}
+          <div style={{marginLeft:"auto",display:"flex",gap:12,alignItems:"center"}}>
+            {[
+              {lbl:"Remote (R)",bg:"#FFFBEB",bc:"#FDE68A",tc:"#92400E"},
+              {lbl:"Office (O)", bg:"#F9FAFB",bc:"#E5E7EB",tc:"#6B7280"},
+              {lbl:"Weekend",    bg:"#F3F4F6",bc:"#E5E7EB",tc:T.inkMuted},
+              {lbl:"Hôm nay",   bg:T.primarySoft,bc:T.primary,tc:T.primary},
+            ].map(l => (
+              <div key={l.lbl} style={{display:"flex",alignItems:"center",gap:5}}>
+                <div style={{width:22,height:18,borderRadius:4,background:l.bg,border:`1px solid ${l.bc}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <span style={{fontSize:9,fontWeight:800,color:l.tc,fontFamily:T.fontM}}>{l.lbl[0]}</span>
+                </div>
+                <span style={{fontSize:10,color:T.inkMuted}}>{l.lbl}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Table ── */}
+      <div style={{flex:1,padding:"16px 28px",overflow:"hidden",display:"flex",flexDirection:"column",gap:12}}>
+
+        {/* Quick fill bar (member) */}
+        {role==="member" && filtered.some(e=>e.name==="Nguyễn Văn An"&&e.status==="none") && (
+          <div style={{padding:"10px 16px",background:T.surface,borderRadius:T.r,border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",flexShrink:0}}>
+            <span style={{fontSize:12,fontWeight:700,color:T.inkSoft}}>Quick fill:</span>
+            {[0,1,2,3].map(w => days[w*7] ? (
+              <button key={w} onClick={()=>applyWeekR(1,w*7)}
+                style={{padding:"4px 10px",borderRadius:T.rSm,border:`1px solid #FDE68A`,background:"#FFFBEB",color:"#92400E",fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                🏠 Tuần {w+1} Remote
+              </button>
+            ) : null)}
+            <div style={{width:1,height:16,background:T.border,margin:"0 4px"}} />
+            <button onClick={()=>resetOffice(1)}
+              style={{padding:"4px 10px",borderRadius:T.rSm,border:`1px solid ${T.border}`,background:T.surfaceAlt,color:T.inkSoft,fontSize:11,fontWeight:700,cursor:"pointer"}}>
+              🏢 Reset về Office
+            </button>
+          </div>
+        )}
+
+        {/* Scroll table */}
+        <div style={{background:T.surface,borderRadius:T.r,border:`1px solid ${T.border}`,boxShadow:T.shMd,overflow:"hidden",flex:1}}>
+          <div style={{overflowX:"auto",overflowY:"auto",maxHeight:"calc(100vh - 220px)"}}>
+            <table style={{borderCollapse:"collapse",width:"max-content",minWidth:"100%",fontFamily:T.fontB}}>
+              <thead style={{position:"sticky",top:0,zIndex:20}}>
+                <tr style={{background:T.surfaceAlt}}>
+                  {/* Sticky left cols */}
+                  {[
+                    {label:"Nhân viên",     w:190, left:0},
+                    {label:"Người duyệt",   w:160, left:190},
+                    {label:"Trạng thái",    w:110, left:350},
+                  ].map(({label,w,left}) => (
+                    <th key={label} style={{position:"sticky",left:left,zIndex:15,background:T.surfaceAlt,padding:"9px 14px",textAlign:"left",fontSize:10,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.06em",borderRight:left===350?`2px solid ${T.border}`:`1px solid ${T.border}`,minWidth:w,whiteSpace:"nowrap",borderBottom:`1px solid ${T.border}`}}>
+                      {label}
+                    </th>
+                  ))}
+                  {/* Date cols */}
+                  {days.map((d,i) => {
+                    const isWE = d.getDay()===0||d.getDay()===6;
+                    const isTd = d.toDateString()===today.toDateString();
+                    return (
+                      <th key={i} style={{padding:"4px 0",textAlign:"center",minWidth:36,width:36,fontSize:9,fontWeight:700,color:isTd?T.primary:isWE?T.inkMuted:T.inkSoft,background:isTd?T.primarySoft:isWE?"#F0F1F3":T.surfaceAlt,borderLeft:`1px solid ${T.borderLight}`,borderBottom:`1px solid ${T.border}`}}>
+                        <div style={{fontFamily:T.fontM}}>{String(d.getDate()).padStart(2,"0")}</div>
+                        <div style={{fontSize:8,marginTop:1,opacity:isWE?0.6:0.8}}>{DNAMES[d.getDay()]}</div>
+                        {isTd && <div style={{width:4,height:4,borderRadius:"50%",background:T.primary,margin:"2px auto 0"}} />}
+                      </th>
+                    );
+                  })}
+                  {/* Summary */}
+                  <th style={{padding:"9px 8px",textAlign:"center",fontSize:10,fontWeight:700,color:"#92400E",textTransform:"uppercase",letterSpacing:"0.06em",borderLeft:`2px solid ${T.border}`,minWidth:36,background:"#FFFBEB",borderBottom:`1px solid ${T.border}`,whiteSpace:"nowrap"}}>R</th>
+                  <th style={{padding:"9px 8px",textAlign:"center",fontSize:10,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.06em",borderLeft:`1px solid ${T.border}`,minWidth:36,background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,whiteSpace:"nowrap"}}>O</th>
+                  <th style={{padding:"9px 8px",textAlign:"center",fontSize:10,fontWeight:700,color:T.primary,textTransform:"uppercase",letterSpacing:"0.06em",borderLeft:`1px solid ${T.border}`,minWidth:52,background:T.primarySoft,borderBottom:`1px solid ${T.border}`,whiteSpace:"nowrap"}}>WFH%</th>
+                  {(role==="approver"||role==="admin") && (
+                    <th style={{padding:"9px 12px",textAlign:"center",fontSize:10,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.06em",borderLeft:`2px solid ${T.border}`,minWidth:110,background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,whiteSpace:"nowrap"}}>Hành động</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((emp) => {
+                  const locked = emp.status==="pending"||emp.status==="approved";
+                  const edit   = canEdit(emp);
+                  const sc     = ST_CFG[emp.status];
+                  const {r,o,pct} = stats(emp.id);
+                  const dc = DEPT_COLOR[emp.dept] || T.primary;
+
+                  return (
+                    <tr key={emp.id} style={{borderBottom:`1px solid ${T.borderLight}`}}
+                      onMouseEnter={e=>{ Array.from(e.currentTarget.cells).forEach(c=>{ if (!c.dataset.sticky) c.style.background="#F0F6FF"; }); }}
+                      onMouseLeave={e=>{ Array.from(e.currentTarget.cells).forEach(c=>{ if (!c.dataset.sticky) c.style.background=""; }); }}>
+
+                      {/* Name */}
+                      <td data-sticky="1" style={{position:"sticky",left:0,zIndex:5,background:T.surface,padding:"10px 14px",borderRight:`1px solid ${T.border}`,minWidth:190}}>
+                        <div style={{display:"flex",alignItems:"center",gap:9}}>
+                          <Avatar name={emp.name} size={30} colors={[`${dc}30`,dc]} />
+                          <div>
+                            <div style={{fontSize:13,fontWeight:600,color:T.ink,whiteSpace:"nowrap"}}>{emp.name}</div>
+                            <div style={{fontSize:10,color:dc,fontWeight:600,marginTop:1}}>{emp.dept}</div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Approver */}
+                      <td data-sticky="1" style={{position:"sticky",left:190,zIndex:5,background:T.surface,padding:"10px 10px",borderRight:`1px solid ${T.border}`,minWidth:160}}>
+                        {edit ? (
+                          <select value={emp.approver} onChange={e=>setEmps(prev=>prev.map(x=>x.id===emp.id?{...x,approver:e.target.value}:x))}
+                            style={{width:"100%",padding:"4px 8px",borderRadius:T.rSm,border:`1px solid ${T.border}`,fontSize:11,fontFamily:T.fontB,color:T.ink,background:T.surface,cursor:"pointer",outline:"none"}}>
+                            {APPROVERS.map(a => <option key={a}>{a}</option>)}
+                          </select>
+                        ) : (
+                          <span style={{fontSize:11,color:T.inkSoft,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",display:"block",maxWidth:140}}>{emp.approver}</span>
+                        )}
+                      </td>
+
+                      {/* Status */}
+                      <td data-sticky="1" style={{position:"sticky",left:350,zIndex:5,background:T.surface,padding:"10px 10px",borderRight:`2px solid ${T.border}`,textAlign:"center",minWidth:110}}>
+                        <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                          <Badge color={sc.c} bg={sc.bg} dot>{sc.l}</Badge>
+                          {edit && emp.status==="none" && (
+                            <button onClick={()=>submit(emp.id)}
+                              style={{marginTop:2,padding:"3px 8px",borderRadius:T.rSm,border:"none",background:T.primarySoft,color:T.primary,fontSize:10,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>
+                              Gửi duyệt →
+                            </button>
+                          )}
+                          {edit && emp.status==="rejected" && (
+                            <button onClick={()=>setEmps(prev=>prev.map(x=>x.id===emp.id?{...x,status:"none"}:x))}
+                              style={{marginTop:2,padding:"3px 8px",borderRadius:T.rSm,border:"none",background:T.warningSoft,color:T.warning,fontSize:10,fontWeight:700,cursor:"pointer"}}>
+                              Sửa lại
+                            </button>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Day cells */}
+                      {days.map((d,i) => {
+                        const isWE = d.getDay()===0||d.getDay()===6;
+                        const isTd = d.toDateString()===today.toDateString();
+                        const val  = emp.schedule?.[i] || (isWE?"":"O");
+                        const isR  = val==="R";
+
+                        const bg = isWE?"#F0F1F3":isR?"#FFFBEB":"#FAFAFA";
+                        const bc = isWE?"#E2E5EA":isR?"#FDE68A":"#EBEBEB";
+                        const fc = isWE?T.inkMuted:isR?"#92400E":"#6B7280";
+
+                        return (
+                          <td key={i} onClick={() => !isWE&&edit&&toggle(emp.id,i)}
+                            title={`${d.toLocaleDateString("vi-VN")} · ${emp.name} · ${isWE?"Cuối tuần":val==="R"?"Remote":"Office"}`}
+                            style={{textAlign:"center",padding:"3px 2px",borderLeft:`1px solid ${T.borderLight}`,background:"white",cursor:!isWE&&edit?"pointer":"default",transition:"background 0.08s"}}>
+                            {!isWE && val ? (
+                              <div style={{width:30,height:24,margin:"auto",borderRadius:4,background:bg,border:`1px solid ${bc}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,fontFamily:T.fontM,color:fc,transition:"all 0.1s",outline:isTd?`2px solid ${T.primary}`:undefined,outlineOffset:-2,userSelect:"none"}}>
+                                {val}
+                              </div>
+                            ) : (
+                              <div style={{width:30,height:24,margin:"auto",borderRadius:4,background:isWE?"#ECEEF0":"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                                {isWE && <span style={{fontSize:9,color:T.inkMuted,opacity:0.5}}>—</span>}
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+
+                      {/* Summary */}
+                      <td style={{textAlign:"center",padding:"8px 8px",borderLeft:`2px solid ${T.border}`,minWidth:36,background:"#FFFBEB8A"}}>
+                        <span style={{fontSize:13,fontWeight:800,fontFamily:T.fontM,color:"#92400E"}}>{r}</span>
+                      </td>
+                      <td style={{textAlign:"center",padding:"8px 8px",borderLeft:`1px solid ${T.border}`,minWidth:36}}>
+                        <span style={{fontSize:13,fontWeight:700,fontFamily:T.fontM,color:T.inkSoft}}>{o}</span>
+                      </td>
+                      <td style={{textAlign:"center",padding:"8px 8px",borderLeft:`1px solid ${T.border}`,minWidth:52}}>
+                        <span style={{fontSize:12,fontWeight:700,color:pct>=50?T.primary:T.inkSoft}}>{pct}%</span>
+                      </td>
+
+                      {/* Approve actions */}
+                      {(role==="approver"||role==="admin") && (
+                        <td style={{textAlign:"center",padding:"8px 10px",borderLeft:`2px solid ${T.border}`,minWidth:110}}>
+                          {emp.status==="pending" ? (
+                            <div style={{display:"flex",gap:5,justifyContent:"center"}}>
+                              <button onClick={()=>decide(emp.id,"approved")} style={{padding:"4px 10px",borderRadius:T.rSm,border:"none",background:T.successSoft,color:T.success,fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                                ✓ Duyệt
+                              </button>
+                              <button onClick={()=>decide(emp.id,"rejected")} style={{padding:"4px 10px",borderRadius:T.rSm,border:"none",background:T.dangerSoft,color:T.danger,fontSize:11,fontWeight:700,cursor:"pointer"}}>
+                                ✕ Từ chối
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{fontSize:11,color:T.inkMuted}}>—</span>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+                {filtered.length===0 && (
+                  <tr>
+                    <td colSpan={days.length+7} style={{textAlign:"center",padding:"48px",color:T.inkMuted,fontSize:13}}>
+                      <div style={{fontSize:28,marginBottom:8}}>📅</div>
+                      <div style={{fontWeight:600,color:T.ink,marginBottom:4}}>Không có dữ liệu</div>
+                      <div style={{fontSize:12}}>Thử thay đổi bộ lọc</div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Stats footer */}
+        <div style={{display:"flex",gap:10,flexShrink:0,flexWrap:"wrap"}}>
+          {[
+            {label:"Tổng",       v:emps.length,                                  c:T.primary },
+            {label:"Chờ duyệt", v:emps.filter(e=>e.status==="pending").length,   c:T.warning },
+            {label:"Đã duyệt",  v:emps.filter(e=>e.status==="approved").length,  c:T.success },
+            {label:"Từ chối",   v:emps.filter(e=>e.status==="rejected").length,  c:T.danger  },
+          ].map((s,i)=>(
+            <div key={i} style={{padding:"8px 16px",background:T.surface,borderRadius:T.r,border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:8}}>
+              <div style={{width:7,height:7,borderRadius:"50%",background:s.c}} />
+              <span style={{fontSize:12,color:T.inkSoft}}>{s.label}:</span>
+              <span style={{fontSize:14,fontWeight:800,fontFamily:T.fontD,color:s.c}}>{s.v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const App = function App() {
   const [page, setPage] = useState("dashboard");
 
@@ -6712,7 +7148,7 @@ const App = function App() {
     skill: <PlaceholderPage title="Quản lý năng lực" subtitle="Ma trận năng lực, đánh giá kỹ năng theo level và lộ trình phát triển" icon="📊" breadcrumb={["Tổng quan", "Năng lực"]} items={["Skill matrix", "Self-assessment", "Manager review", "Career path", "Gap analysis"]} />,
     contract: <ContractPage />,
     payroll: <PayrollPage />,
-    settings: <SettingsPage />,
+    workschedule: <WorkSchedulePage />,
   };
 
   return (
