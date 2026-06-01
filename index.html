@@ -562,7 +562,7 @@ const LeavePage = ({ onNav }) => {
 
   // Datetime form state
   const [leaveForm, setLeaveForm] = useState({
-    type: "", fromDt: "", toDt: "", reason: "",
+    type: "", ranges: [{ id: 1, from: "", to: "" }], reason: "",
   });
 
   // Available approval workflows (mirrors Settings data)
@@ -1256,106 +1256,158 @@ const LeavePage = ({ onNav }) => {
 
       {/* NEW LEAVE MODAL */}
       {modal === "new" && (() => {
-        // Calculate duration from leaveForm.fromDt and leaveForm.toDt
-        const calcDuration = () => {
-          if (!leaveForm.fromDt || !leaveForm.toDt) return null;
-          const from = new Date(leaveForm.fromDt);
-          const to   = new Date(leaveForm.toDt);
-          if (isNaN(from) || isNaN(to) || to <= from) return null;
-          const diffMs  = to - from;
-          const diffHrs = diffMs / 3600000;
-          const WORK_HRS = 8;
-          if (diffHrs < WORK_HRS) {
-            const h = Math.floor(diffHrs);
-            const m = Math.round((diffHrs - h) * 60);
-            return m > 0 ? `${h} giờ ${m} phút` : `${h} giờ`;
-          }
-          const days = Math.floor(diffHrs / WORK_HRS);
-          const remH = Math.round(diffHrs % WORK_HRS * 10) / 10;
-          if (remH === 0) return `${days} ngày`;
-          if (remH < 1)  return `${days} ngày ${Math.round(remH * 60)} phút`;
-          return `${days} ngày ${remH} giờ`;
+        const WORK_HRS = 8;
+
+        // Calculate hours for a single range
+        const rangeHrs = (from, to) => {
+          if (!from || !to) return 0;
+          const f = new Date(from), t = new Date(to);
+          if (isNaN(f) || isNaN(t) || t <= f) return 0;
+          return (t - f) / 3600000;
         };
-        const duration = calcDuration();
-        const hasRange = leaveForm.fromDt && leaveForm.toDt && new Date(leaveForm.toDt) > new Date(leaveForm.fromDt);
+
+        // Format total hours → readable
+        const fmtHrs = (h) => {
+          if (h <= 0) return null;
+          if (h < WORK_HRS) {
+            const wh = Math.floor(h), wm = Math.round((h - wh) * 60);
+            return wm > 0 ? `${wh} giờ ${wm} phút` : `${wh} giờ`;
+          }
+          const days = Math.floor(h / WORK_HRS), rem = Math.round((h % WORK_HRS) * 10) / 10;
+          if (rem === 0) return `${days} ngày`;
+          if (rem < 1)   return `${days} ngày ${Math.round(rem * 60)} phút`;
+          return `${days} ngày ${rem} giờ`;
+        };
+
+        // Overlap check: returns true if any two ranges overlap
+        const hasOverlap = (ranges) => {
+          const valid = ranges.filter(r => r.from && r.to && new Date(r.to) > new Date(r.from));
+          for (let i = 0; i < valid.length; i++)
+            for (let j = i + 1; j < valid.length; j++) {
+              const aF = new Date(valid[i].from), aT = new Date(valid[i].to);
+              const bF = new Date(valid[j].from), bT = new Date(valid[j].to);
+              if (aF < bT && bF < aT) return true;
+            }
+          return false;
+        };
+
+        const totalHrs   = leaveForm.ranges.reduce((sum, r) => sum + rangeHrs(r.from, r.to), 0);
+        const totalFmt   = fmtHrs(totalHrs);
+        const overlap    = hasOverlap(leaveForm.ranges);
+        const allValid   = leaveForm.ranges.every(r => r.from && r.to && new Date(r.to) > new Date(r.from));
+        const canSubmit  = leaveForm.type && leaveForm.ranges.length > 0 && allValid && !overlap && leaveForm.reason;
+
+        const addRange   = () => setLeaveForm(p => ({ ...p, ranges: [...p.ranges, { id: Date.now(), from: "", to: "" }] }));
+        const removeRange= (id) => setLeaveForm(p => ({ ...p, ranges: p.ranges.filter(r => r.id !== id) }));
+        const updateRange= (id, field, val) => setLeaveForm(p => ({ ...p, ranges: p.ranges.map(r => r.id === id ? { ...r, [field]: val } : r) }));
 
         return (
-          <Modal title="Tạo đơn nghỉ phép" onClose={() => { setModal(null); setLeaveForm({ type: "", fromDt: "", toDt: "", reason: "" }); }} width={560}>
+          <Modal title="Tạo đơn nghỉ phép" onClose={() => { setModal(null); setLeaveForm({ type: "", ranges: [{ id: 1, from: "", to: "" }], reason: "" }); }} width={600}>
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
               {/* Loại nghỉ phép */}
               <div>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Loại nghỉ phép *</label>
-                <select
-                  value={leaveForm.type}
-                  onChange={e => setLeaveForm(p => ({ ...p, type: e.target.value }))}
-                  style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1.5px solid ${leaveForm.type ? T.primary : T.border}`, fontSize: 13, fontFamily: T.fontB, color: leaveForm.type ? T.ink : T.inkMuted, background: T.surface, boxSizing: "border-box" }}
-                >
+                <select value={leaveForm.type} onChange={e => setLeaveForm(p => ({ ...p, type: e.target.value }))}
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1.5px solid ${leaveForm.type ? T.primary : T.border}`, fontSize: 13, fontFamily: T.fontB, color: leaveForm.type ? T.ink : T.inkMuted, background: T.surface, boxSizing: "border-box" }}>
                   <option value="">— Chọn loại phép —</option>
                   {leavePolicies.map(lp => <option key={lp.id} value={lp.type}>{lp.type}</option>)}
                 </select>
               </div>
 
-              {/* Datetime pickers */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>
-                    Từ ngày & giờ *
+              {/* ── Time Ranges ── */}
+              <div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: T.inkSoft }}>
+                    Khoảng thời gian nghỉ *
+                    <span style={{ fontSize: 11, fontWeight: 400, color: T.inkMuted, marginLeft: 6 }}>({leaveForm.ranges.length} khoảng)</span>
                   </label>
-                  <input
-                    type="datetime-local"
-                    value={leaveForm.fromDt}
-                    onChange={e => setLeaveForm(p => ({ ...p, fromDt: e.target.value }))}
-                    style={{
-                      width: "100%", padding: "9px 12px", borderRadius: T.rSm,
-                      border: `1.5px solid ${leaveForm.fromDt ? T.primary : T.border}`,
-                      fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface,
-                      boxSizing: "border-box", outline: "none",
-                    }}
-                  />
+                  <button onClick={addRange}
+                    style={{ display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: T.rFull, border: `1.5px solid ${T.primary}`, background: T.primarySoft, color: T.primary, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Thêm khoảng
+                  </button>
                 </div>
-                <div>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>
-                    Đến ngày & giờ *
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={leaveForm.toDt}
-                    min={leaveForm.fromDt || undefined}
-                    onChange={e => setLeaveForm(p => ({ ...p, toDt: e.target.value }))}
-                    style={{
-                      width: "100%", padding: "9px 12px", borderRadius: T.rSm,
-                      border: `1.5px solid ${leaveForm.toDt ? T.primary : T.border}`,
-                      fontSize: 13, fontFamily: T.fontB, color: T.ink, background: T.surface,
-                      boxSizing: "border-box", outline: "none",
-                    }}
-                  />
+
+                {/* Table header */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 56px 32px", gap: 8, padding: "6px 10px", background: T.surfaceAlt, borderRadius: `${T.rSm} ${T.rSm} 0 0`, border: `1px solid ${T.border}`, borderBottom: "none" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>Từ ngày & giờ</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>Đến ngày & giờ</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>Thời lượng</div>
+                  <div></div>
                 </div>
+
+                {/* Rows */}
+                <div style={{ border: `1px solid ${T.border}`, borderRadius: `0 0 ${T.rSm} ${T.rSm}`, overflow: "hidden" }}>
+                  {leaveForm.ranges.map((r, i) => {
+                    const hrs     = rangeHrs(r.from, r.to);
+                    const hrsStr  = fmtHrs(hrs);
+                    const toErr   = r.from && r.to && new Date(r.to) <= new Date(r.from);
+                    // Check if this row overlaps with another
+                    const rowOverlap = overlap && r.from && r.to && !toErr &&
+                      leaveForm.ranges.some((other, j) => {
+                        if (j === i || !other.from || !other.to) return false;
+                        const aF = new Date(r.from), aT = new Date(r.to);
+                        const bF = new Date(other.from), bT = new Date(other.to);
+                        return aF < bT && bF < aT;
+                      });
+
+                    return (
+                      <div key={r.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 56px 32px", gap: 8, padding: "8px 10px", borderBottom: i < leaveForm.ranges.length - 1 ? `1px solid ${T.borderLight}` : "none", background: rowOverlap ? "#FFF7ED" : i % 2 === 0 ? "white" : T.surfaceAlt, alignItems: "center" }}>
+                        {/* From */}
+                        <div>
+                          <input type="datetime-local" value={r.from} onChange={e => updateRange(r.id, "from", e.target.value)}
+                            style={{ width: "100%", padding: "7px 10px", borderRadius: T.rSm, border: `1.5px solid ${r.from ? T.primary : T.border}`, fontSize: 12, fontFamily: T.fontB, color: T.ink, background: "white", boxSizing: "border-box", outline: "none" }} />
+                        </div>
+                        {/* To */}
+                        <div>
+                          <input type="datetime-local" value={r.to} min={r.from || undefined} onChange={e => updateRange(r.id, "to", e.target.value)}
+                            style={{ width: "100%", padding: "7px 10px", borderRadius: T.rSm, border: `1.5px solid ${toErr ? T.danger : r.to ? T.primary : T.border}`, fontSize: 12, fontFamily: T.fontB, color: T.ink, background: "white", boxSizing: "border-box", outline: "none" }} />
+                          {toErr && <div style={{ fontSize: 10, color: T.danger, marginTop: 2 }}>⚠ Phải sau giờ bắt đầu</div>}
+                        </div>
+                        {/* Duration chip */}
+                        <div style={{ textAlign: "center" }}>
+                          {hrsStr ? (
+                            <span style={{ display: "inline-block", padding: "3px 7px", borderRadius: T.rFull, background: rowOverlap ? "#FED7AA" : T.primarySoft, border: `1px solid ${rowOverlap ? "#F97316" : T.primary + "40"}`, fontSize: 10, fontWeight: 700, color: rowOverlap ? "#C2410C" : T.primary, whiteSpace: "nowrap" }}>
+                              {hrsStr}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: 10, color: T.inkMuted }}>—</span>
+                          )}
+                        </div>
+                        {/* Remove */}
+                        <button onClick={() => removeRange(r.id)} disabled={leaveForm.ranges.length === 1}
+                          style={{ width: 26, height: 26, borderRadius: T.rSm, border: "none", background: leaveForm.ranges.length === 1 ? T.surfaceAlt : T.dangerSoft, color: leaveForm.ranges.length === 1 ? T.border : T.danger, cursor: leaveForm.ranges.length === 1 ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Overlap error */}
+                {overlap && (
+                  <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 7, padding: "8px 12px", background: "#FFF7ED", border: "1px solid #FED7AA", borderRadius: T.rSm, fontSize: 12, color: "#92400E" }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    Các khoảng thời gian bị <b>trùng lặp</b>. Vui lòng kiểm tra lại.
+                  </div>
+                )}
               </div>
 
-              {/* Duration display */}
-              <div style={{
-                display: "flex", alignItems: "center", gap: 12,
-                padding: "12px 16px", borderRadius: T.r,
-                background: hasRange ? T.primarySoft : T.surfaceAlt,
-                border: `1.5px solid ${hasRange ? T.primary + "40" : T.border}`,
-                transition: "all 0.2s",
-              }}>
-                <div style={{ fontSize: 20 }}>⏱</div>
+              {/* ── Total Duration summary ── */}
+              <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", borderRadius: T.r, background: totalHrs > 0 ? T.primarySoft : T.surfaceAlt, border: `1.5px solid ${totalHrs > 0 ? T.primary + "50" : T.border}`, transition: "all 0.2s" }}>
+                <div style={{ fontSize: 22 }}>⏱</div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>
-                    Tổng thời gian nghỉ
-                  </div>
-                  <div style={{ fontSize: hasRange ? 20 : 14, fontWeight: 800, fontFamily: T.fontD, color: hasRange ? T.primary : T.inkMuted, lineHeight: 1.2 }}>
-                    {hasRange ? duration : "— Chọn thời gian để tính —"}
+                  <div style={{ fontSize: 11, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3 }}>Tổng thời gian nghỉ</div>
+                  <div style={{ fontSize: totalHrs > 0 ? 22 : 14, fontWeight: 800, fontFamily: T.fontD, color: totalHrs > 0 ? T.primary : T.inkMuted, lineHeight: 1.2 }}>
+                    {totalHrs > 0 ? totalFmt : "— Nhập thời gian để tính —"}
                   </div>
                 </div>
-                {hasRange && (
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 11, color: T.inkMuted }}>Từ</div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: T.ink }}>{new Date(leaveForm.fromDt).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
-                    <div style={{ fontSize: 11, color: T.inkMuted, marginTop: 2 }}>Đến</div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: T.ink }}>{new Date(leaveForm.toDt).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div>
+                {totalHrs > 0 && leaveForm.ranges.length > 1 && (
+                  <div style={{ fontSize: 11, color: T.inkSoft, textAlign: "right" }}>
+                    {leaveForm.ranges.filter(r => rangeHrs(r.from, r.to) > 0).map((r, i) => (
+                      <div key={r.id}>Khoảng {i + 1}: <b>{fmtHrs(rangeHrs(r.from, r.to))}</b></div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -1363,16 +1415,12 @@ const LeavePage = ({ onNav }) => {
               {/* Lý do */}
               <div>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Lý do *</label>
-                <textarea
-                  rows={3}
-                  placeholder="Nhập lý do nghỉ phép..."
-                  value={leaveForm.reason}
-                  onChange={e => setLeaveForm(p => ({ ...p, reason: e.target.value }))}
-                  style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, resize: "vertical", boxSizing: "border-box" }}
-                />
+                <textarea rows={3} placeholder="Nhập lý do nghỉ phép..."
+                  value={leaveForm.reason} onChange={e => setLeaveForm(p => ({ ...p, reason: e.target.value }))}
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, resize: "vertical", boxSizing: "border-box" }} />
               </div>
 
-              {/* Người phê duyệt (auto từ workflow) */}
+              {/* Luồng phê duyệt */}
               <div>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Luồng phê duyệt</label>
                 <div style={{ padding: "10px 14px", borderRadius: T.rSm, background: T.surfaceAlt, border: `1px solid ${T.border}` }}>
@@ -1406,8 +1454,8 @@ const LeavePage = ({ onNav }) => {
 
               {/* Actions */}
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
-                <Btn v="secondary" onClick={() => { setModal(null); setLeaveForm({ type: "", fromDt: "", toDt: "", reason: "" }); }}>Hủy</Btn>
-                <Btn disabled={!leaveForm.type || !leaveForm.fromDt || !leaveForm.toDt || !hasRange}>Gửi đơn nghỉ phép</Btn>
+                <Btn v="secondary" onClick={() => { setModal(null); setLeaveForm({ type: "", ranges: [{ id: 1, from: "", to: "" }], reason: "" }); }}>Hủy</Btn>
+                <Btn disabled={!canSubmit}>Gửi đơn nghỉ phép</Btn>
               </div>
             </div>
           </Modal>
@@ -3064,14 +3112,19 @@ const TrainingPage = () => {
 // --- WORKFLOW ---
 
 const WorkflowPage = () => {
-  const [modal, setModal] = useState(null); // null | "select" | {type:...} | request obj
+  const [modal, setModal] = useState(null);
   const [filter, setFilter] = useState("Tất cả");
   const [detailReq, setDetailReq] = useState(null);
 
   // ── Search states ─────────────────────────────────────────────
-  const [srchBy,   setSrchBy]   = useState("");  // tên người tạo
-  const [srchFrom, setSrchFrom] = useState("");  // YYYY-MM-DD
-  const [srchTo,   setSrchTo]   = useState("");  // YYYY-MM-DD
+  const [srchBy,   setSrchBy]   = useState("");
+  const [srchFrom, setSrchFrom] = useState("");
+  const [srchTo,   setSrchTo]   = useState("");
+
+  // ── Cancel Request states ─────────────────────────────────────
+  const [cancelReqModal,  setCancelReqModal]  = useState(null);
+  const [cancelReqReason, setCancelReqReason] = useState("");
+  const IS_REQ_MANAGER = true; // Simulated — approver sees Approve/Reject Cancel
 
   const reqTypes = [
     { id: "wfh", icon: "🏠", label: "WFH (Làm từ xa)", desc: "Làm việc tại nhà hoặc ngoài văn phòng", color: T.primary },
@@ -3083,18 +3136,33 @@ const WorkflowPage = () => {
     { id: "other", icon: "📋", label: "Yêu cầu khác", desc: "Các yêu cầu hành chính khác", color: T.inkMuted },
   ];
 
-  const reqs = [
-    { id: "WF-041", type: "WFH", by: "Lê Thị Mai", date: "17/04", st: "pending", desc: "Bảo trì chung cư", icon: "🏠", dept: "Design", created: "13/04 09:30", approver: "Đinh Trọng Hưng" },
-    { id: "WF-040", type: "OT", by: "Nguyễn Văn An", date: "13/04", st: "pending", desc: "Deploy release v2.3 — 4 giờ", icon: "⏰", dept: "Engineering", created: "13/04 08:00", approver: "Đinh Trọng Hưng" },
-    { id: "WF-039", type: "Công tác", by: "Tạ Quang Hiếu", date: "20-22/04", st: "pending", desc: "Khảo sát client tại Đà Nẵng", icon: "✈️", pri: true, dept: "Engineering", created: "12/04 15:00", approver: "Trần Thị Ngọc" },
-    { id: "WF-038", type: "Xác nhận giấy tờ", by: "Vũ Đức Cường", date: "11/04", st: "approved", desc: "Xác nhận thu nhập cho visa Nhật", icon: "📄", dept: "Engineering", created: "11/04 10:00", approver: "Lê Ngọc Minh Thư" },
-    { id: "WF-037", type: "Thiết bị", by: "Nguyễn Thị Hoa", date: "08/04", st: "completed", desc: "Yêu cầu monitor 27 inch", icon: "💻", dept: "HR", created: "08/04 09:00", approver: "Trần Thị Ngọc" },
-    { id: "WF-036", type: "WFH", by: "Bùi Quang Hải", date: "10/04", st: "approved", desc: "Cá nhân", icon: "🏠", dept: "Engineering", created: "09/04 17:00", approver: "Đinh Trọng Hưng" },
-    { id: "WF-035", type: "Đi muộn", by: "Phạm Thị Mai", date: "09/04", st: "approved", desc: "Đưa con đi khám — đến lúc 10:00", icon: "🕐", dept: "Engineering", created: "08/04 18:00", approver: "Nguyễn Hồng Việt" },
-    { id: "WF-034", type: "OT", by: "Nguyễn Hồng Việt", date: "07/04", st: "approved", desc: "Hotfix production — 3 giờ", icon: "⏰", dept: "Engineering", created: "07/04 17:30", approver: "Đinh Trọng Hưng" },
-  ];
+  const [reqs, setReqs] = useState([
+    { id: "WF-042", type: "WFH", by: "Nguyễn Văn An", date: "20/04", st: "pending_cancel", desc: "Làm remote cả tuần — dự án đang gấp", icon: "🏠", dept: "Engineering", created: "15/04 09:00", approver: "Đinh Trọng Hưng",
+      cancelReason: "Tôi cần hủy yêu cầu WFH này do công ty yêu cầu toàn bộ team phải làm việc tại văn phòng trong tuần đó để chuẩn bị cho buổi demo với khách hàng.",
+      history: [
+        { step: "Tạo yêu cầu",               by: "Nguyễn Văn An",   time: "15/04 09:00", cancel: false },
+        { step: "Đinh Trọng Hưng duyệt",      by: "Đinh Trọng Hưng", time: "15/04 11:30", cancel: false },
+        { step: "Yêu cầu hủy",                by: "Nguyễn Văn An",   time: "18/04 16:00", cancel: true  },
+        { step: "Chờ xác nhận hủy",           by: "Đinh Trọng Hưng", time: "Đang chờ",    cancel: true  },
+      ]
+    },
+    { id: "WF-041", type: "WFH",               by: "Lê Thị Mai",       date: "17/04", st: "pending",   desc: "Bảo trì chung cư",                    icon: "🏠", dept: "Design",       created: "13/04 09:30", approver: "Đinh Trọng Hưng",  history: [{ step: "Tạo yêu cầu", by: "Lê Thị Mai",       time: "13/04 09:30", cancel: false }, { step: "Chờ duyệt", by: "Đinh Trọng Hưng", time: "Đang chờ", cancel: false }] },
+    { id: "WF-040", type: "OT",                by: "Nguyễn Văn An",    date: "13/04", st: "pending",   desc: "Deploy release v2.3 — 4 giờ",         icon: "⏰", dept: "Engineering",  created: "13/04 08:00", approver: "Đinh Trọng Hưng",  history: [{ step: "Tạo yêu cầu", by: "Nguyễn Văn An",    time: "13/04 08:00", cancel: false }, { step: "Chờ duyệt", by: "Đinh Trọng Hưng", time: "Đang chờ", cancel: false }] },
+    { id: "WF-039", type: "Công tác",          by: "Tạ Quang Hiếu",    date: "20-22/04", st: "pending", desc: "Khảo sát client tại Đà Nẵng",         icon: "✈️", dept: "Engineering", created: "12/04 15:00", approver: "Trần Thị Ngọc",    pri: true, history: [{ step: "Tạo yêu cầu", by: "Tạ Quang Hiếu",    time: "12/04 15:00", cancel: false }] },
+    { id: "WF-038", type: "Xác nhận giấy tờ", by: "Vũ Đức Cường",     date: "11/04", st: "approved", desc: "Xác nhận thu nhập cho visa Nhật",      icon: "📄", dept: "Engineering",  created: "11/04 10:00", approver: "Lê Ngọc Minh Thư", history: [{ step: "Tạo yêu cầu", by: "Vũ Đức Cường",     time: "11/04 10:00", cancel: false }, { step: "HR duyệt", by: "Lê Ngọc Minh Thư",  time: "11/04 14:00", cancel: false }] },
+    { id: "WF-037", type: "Thiết bị",          by: "Nguyễn Thị Hoa",   date: "08/04", st: "completed",desc: "Yêu cầu monitor 27 inch",              icon: "💻", dept: "HR",           created: "08/04 09:00", approver: "Trần Thị Ngọc",    history: [{ step: "Tạo yêu cầu", by: "Nguyễn Thị Hoa",   time: "08/04 09:00", cancel: false }, { step: "Hoàn tất",  by: "Trần Thị Ngọc",     time: "10/04 11:00", cancel: false }] },
+    { id: "WF-036", type: "WFH",               by: "Bùi Quang Hải",    date: "10/04", st: "approved", desc: "Cá nhân",                              icon: "🏠", dept: "Engineering",  created: "09/04 17:00", approver: "Đinh Trọng Hưng",  history: [{ step: "Tạo yêu cầu", by: "Bùi Quang Hải",    time: "09/04 17:00", cancel: false }, { step: "Đã duyệt",  by: "Đinh Trọng Hưng",   time: "10/04 08:00", cancel: false }] },
+    { id: "WF-035", type: "Đi muộn",           by: "Phạm Thị Mai",     date: "09/04", st: "approved", desc: "Đưa con đi khám — đến lúc 10:00",     icon: "🕐", dept: "Engineering",  created: "08/04 18:00", approver: "Nguyễn Hồng Việt", history: [{ step: "Tạo yêu cầu", by: "Phạm Thị Mai",     time: "08/04 18:00", cancel: false }, { step: "Đã duyệt",  by: "Nguyễn Hồng Việt",  time: "09/04 07:30", cancel: false }] },
+  ]);
 
-  const stM = { pending: { l: "Chờ duyệt", c: T.warning, bg: T.warningSoft }, approved: { l: "Đã duyệt", c: T.success, bg: T.successSoft }, completed: { l: "Hoàn tất", c: T.inkMuted, bg: T.surfaceAlt }, rejected: { l: "Từ chối", c: T.danger, bg: T.dangerSoft } };
+  const stM = {
+    pending:        { l: "Chờ duyệt",     c: T.warning,  bg: T.warningSoft },
+    approved:       { l: "Đã duyệt",      c: T.success,  bg: T.successSoft },
+    completed:      { l: "Hoàn tất",      c: T.inkMuted, bg: T.surfaceAlt  },
+    rejected:       { l: "Từ chối",       c: T.danger,   bg: T.dangerSoft  },
+    pending_cancel: { l: "Chờ duyệt hủy", c: "#D97706",  bg: "#FEF3C7"     },
+    cancelled:      { l: "Đã hủy",        c: T.danger,   bg: T.dangerSoft  },
+  };
 
   // Helper: parse "DD/MM" or "DD-DD/MM" → Date (first date) using 2026
   const parseReqDate = (d = "") => {
@@ -3470,57 +3538,257 @@ const WorkflowPage = () => {
 
       {/* ===== REQUEST DETAIL MODAL ===== */}
       {detailReq && (
-        <Modal title={`Chi tiết ${detailReq.id}`} onClose={() => setDetailReq(null)} width={520}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", background: T.surfaceAlt, borderRadius: T.r, marginBottom: 20 }}>
-            <div style={{ fontSize: 28 }}>{detailReq.icon}</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 16, fontWeight: 700, fontFamily: T.fontD, color: T.ink }}>{detailReq.type}</div>
-              <div style={{ fontSize: 12, color: T.inkMuted }}>{detailReq.by} · {detailReq.dept}</div>
+        <Modal
+          title={detailReq.st === "pending_cancel" ? `Yêu cầu hủy — ${detailReq.id}` : `Chi tiết ${detailReq.id}`}
+          onClose={() => setDetailReq(null)}
+          width={540}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+            {/* ── Cancel Request Banner ── */}
+            {detailReq.st === "pending_cancel" && (
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 16px", background: "#FEF3C7", border: "1.5px solid #FCD34D", borderRadius: T.r }}>
+                <div style={{ width: 36, height: 36, borderRadius: T.rSm, background: "#FDE68A", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#92400E" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                  </svg>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#92400E", marginBottom: 3 }}>Yêu cầu hủy đang chờ phê duyệt</div>
+                  <div style={{ fontSize: 12, color: "#78350F" }}>{detailReq.by} đã gửi yêu cầu hủy yêu cầu này. Vui lòng xem lý do và xác nhận bên dưới.</div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Header ── */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", background: T.surfaceAlt, borderRadius: T.r }}>
+              <div style={{ fontSize: 28 }}>{detailReq.icon}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, fontFamily: T.fontD, color: T.ink }}>{detailReq.type}</div>
+                <div style={{ fontSize: 12, color: T.inkMuted }}>{detailReq.by} · {detailReq.dept}</div>
+                {detailReq.st === "pending_cancel" && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#D97706", fontWeight: 600, marginTop: 3 }}>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+                    Yêu cầu hủy đang chờ duyệt
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5 }}>
+                <Badge color={stM[detailReq.st]?.c || T.inkMuted} bg={stM[detailReq.st]?.bg || T.surfaceAlt} dot>
+                  {stM[detailReq.st]?.l || detailReq.st}
+                </Badge>
+              </div>
             </div>
-            <Badge color={stM[detailReq.st].c} bg={stM[detailReq.st].bg} dot>{stM[detailReq.st].l}</Badge>
+
+            {/* ── Info rows ── */}
+            {[
+              ["Mã yêu cầu",  detailReq.id],
+              ["Loại",        detailReq.type],
+              ["Người tạo",   detailReq.by],
+              ["Phòng ban",   detailReq.dept],
+              ["Ngày áp dụng",detailReq.date],
+              ["Nội dung",    detailReq.desc],
+              ["Ngày tạo",    detailReq.created],
+              ["Người duyệt", detailReq.approver],
+            ].map(([k, v], i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${T.borderLight}` }}>
+                <span style={{ fontSize: 12, color: T.inkMuted, fontWeight: 600 }}>{k}</span>
+                <span style={{ fontSize: 13, color: T.ink, fontWeight: 500, textAlign: "right", maxWidth: 280 }}>{v}</span>
+              </div>
+            ))}
+
+            {/* ── Cancellation Reason Card ── */}
+            {detailReq.st === "pending_cancel" && detailReq.cancelReason && (
+              <div style={{ background: "#FFF7ED", border: "1.5px solid #FED7AA", borderRadius: T.r, overflow: "hidden" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", background: "#FFEDD5", borderBottom: "1px solid #FED7AA" }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#C2410C" strokeWidth="2.2" strokeLinecap="round">
+                    <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                  </svg>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#C2410C", textTransform: "uppercase", letterSpacing: "0.06em" }}>Lý do hủy yêu cầu</span>
+                  <span style={{ fontSize: 10, color: "#9A3412", marginLeft: "auto" }}>Từ: {detailReq.by}</span>
+                </div>
+                <div style={{ padding: "12px 14px" }}>
+                  <p style={{ fontSize: 13, color: "#7C2D12", lineHeight: 1.65, margin: 0, fontStyle: "italic" }}>
+                    "{detailReq.cancelReason}"
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* ── Cancelled info ── */}
+            {detailReq.st === "cancelled" && (
+              <div style={{ padding: "10px 14px", background: T.dangerSoft, border: `1px solid ${T.danger}30`, borderRadius: T.rSm, fontSize: 12, color: T.danger, display: "flex", alignItems: "center", gap: 8 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                Yêu cầu này đã bị hủy.
+              </div>
+            )}
+
+            {/* ── Timeline ── */}
+            <div style={{ marginTop: 4 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: T.inkMuted, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.06em" }}>Lịch sử xử lý</div>
+              {(detailReq.history || [
+                { step: "Tạo yêu cầu", by: detailReq.by, time: detailReq.created, cancel: false },
+                { step: `Chờ ${detailReq.approver} duyệt`, by: detailReq.approver, time: detailReq.st === "pending" ? "Đang chờ" : "Đã xử lý", cancel: false },
+                ...(detailReq.st !== "pending" ? [{ step: detailReq.st === "approved" ? "Đã duyệt" : "Hoàn tất", by: detailReq.approver, time: "Đã xử lý", cancel: false }] : []),
+              ]).map((s, i, arr) => {
+                const isPending = s.time === "Đang chờ" || s.time === "Đang chờ...";
+                const dotColor  = isPending ? T.border : s.cancel ? "#D97706" : T.success;
+                return (
+                  <div key={i} style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                      <div style={{ width: 10, height: 10, borderRadius: "50%", background: dotColor, border: `2px solid ${dotColor}`, flexShrink: 0 }} />
+                      {i < arr.length - 1 && <div style={{ width: 2, flex: 1, minHeight: 16, background: T.borderLight, margin: "2px 0" }} />}
+                    </div>
+                    <div style={{ paddingBottom: 4 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: s.cancel ? "#92400E" : T.ink }}>{s.step}</div>
+                      <div style={{ fontSize: 11, color: T.inkMuted }}>{s.by} · {s.time}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* ── ACTION BUTTONS ── */}
+            <div style={{ borderTop: `1px solid ${T.borderLight}`, paddingTop: 12 }}>
+
+              {/* Manager: pending → Duyệt / Từ chối */}
+              {detailReq.st === "pending" && IS_REQ_MANAGER && (
+                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                  <Btn v="danger" onClick={() => {
+                    const h = { step: "Từ chối yêu cầu", by: detailReq.approver, time: "Vừa xong", cancel: false };
+                    setReqs(prev => prev.map(r => r.id === detailReq.id ? { ...r, st: "rejected", history: [...(r.history||[]), h] } : r));
+                    setDetailReq(p => ({ ...p, st: "rejected", history: [...(p.history||[]), h] }));
+                  }}>Từ chối</Btn>
+                  <Btn onClick={() => {
+                    const h = { step: "Đã phê duyệt", by: detailReq.approver, time: "Vừa xong", cancel: false };
+                    setReqs(prev => prev.map(r => r.id === detailReq.id ? { ...r, st: "approved", history: [...(r.history||[]), h] } : r));
+                    setDetailReq(p => ({ ...p, st: "approved", history: [...(p.history||[]), h] }));
+                  }}>Phê duyệt</Btn>
+                </div>
+              )}
+
+              {/* Owner: approved → Cancel Request */}
+              {detailReq.st === "approved" && detailReq.by === "Nguyễn Văn An" && (
+                <div style={{ display: "flex", gap: 10, justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ fontSize: 11, color: T.inkMuted }}>Yêu cầu đã được duyệt. Hủy sẽ cần người duyệt xác nhận.</div>
+                  <Btn v="danger" onClick={() => { setCancelReqModal(detailReq); setCancelReqReason(""); }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                    Cancel Request
+                  </Btn>
+                </div>
+              )}
+
+              {/* Owner: pending_cancel → waiting notice */}
+              {detailReq.st === "pending_cancel" && detailReq.by === "Nguyễn Văn An" && !IS_REQ_MANAGER && (
+                <div style={{ padding: "10px 14px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: T.rSm, display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#92400E" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  Yêu cầu hủy của bạn đang chờ người duyệt xác nhận.
+                </div>
+              )}
+
+              {/* Approver: pending_cancel → Reject Cancel / Approve Cancel */}
+              {detailReq.st === "pending_cancel" && IS_REQ_MANAGER && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ padding: "10px 14px", background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: T.rSm, display: "flex", alignItems: "flex-start", gap: 8 }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 1 }}>
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#92400E", marginBottom: 2 }}>Đây là yêu cầu HỦY — không phải yêu cầu mới</div>
+                      <div style={{ fontSize: 11, color: "#78350F" }}>
+                        Nếu <b>Approve Cancel</b>: yêu cầu chuyển sang <b>Đã hủy</b>.
+                        Nếu <b>Reject Cancel</b>: yêu cầu giữ nguyên trạng thái <b>Đã duyệt</b>.
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                    <Btn v="secondary" onClick={() => {
+                      const h = { step: "Từ chối hủy — giữ nguyên yêu cầu", by: detailReq.approver, time: "Vừa xong", cancel: true };
+                      setReqs(prev => prev.map(r => r.id === detailReq.id ? { ...r, st: "approved", history: [...(r.history||[]), h] } : r));
+                      setDetailReq(p => ({ ...p, st: "approved", history: [...(p.history||[]), h] }));
+                    }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      Reject Cancel
+                    </Btn>
+                    <Btn style={{ background: "#D97706", color: "white", border: "none" }} onClick={() => {
+                      const h = { step: "Đã duyệt hủy — yêu cầu bị hủy", by: detailReq.approver, time: "Vừa xong", cancel: true };
+                      setReqs(prev => prev.map(r => r.id === detailReq.id ? { ...r, st: "cancelled", history: [...(r.history||[]), h] } : r));
+                      setDetailReq(p => ({ ...p, st: "cancelled", history: [...(p.history||[]), h] }));
+                    }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      Approve Cancel
+                    </Btn>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
+        </Modal>
+      )}
 
-          {[
-            ["Mã yêu cầu", detailReq.id],
-            ["Loại", detailReq.type],
-            ["Người tạo", detailReq.by],
-            ["Phòng ban", detailReq.dept],
-            ["Ngày áp dụng", detailReq.date],
-            ["Nội dung", detailReq.desc],
-            ["Ngày tạo", detailReq.created],
-            ["Người duyệt", detailReq.approver],
-          ].map(([k, v], i) => (
-            <div key={i} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${T.borderLight}` }}>
-              <span style={{ fontSize: 12, color: T.inkMuted, fontWeight: 600 }}>{k}</span>
-              <span style={{ fontSize: 13, color: T.ink, fontWeight: 500, textAlign: "right", maxWidth: 280 }}>{v}</span>
-            </div>
-          ))}
-
-          {/* Approval Timeline */}
-          <div style={{ marginTop: 16, fontSize: 12, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>Lịch sử xử lý</div>
-          {[
-            { step: "Tạo yêu cầu", by: detailReq.by, time: detailReq.created, done: true },
-            { step: `Chờ ${detailReq.approver} duyệt`, by: detailReq.approver, time: detailReq.st === "pending" ? "Đang chờ..." : "Đã xử lý", done: detailReq.st !== "pending" },
-            ...(detailReq.st !== "pending" ? [{ step: detailReq.st === "approved" ? "Đã duyệt" : "Hoàn tất", by: detailReq.approver, time: "Đã xử lý", done: true }] : []),
-          ].map((s, i) => (
-            <div key={i} style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <div style={{ width: 10, height: 10, borderRadius: "50%", background: s.done ? T.success : T.border }} />
-                {i < 2 && <div style={{ width: 2, height: 20, background: T.borderLight }} />}
-              </div>
+      {/* ===== CANCEL REQUEST MODAL ===== */}
+      {cancelReqModal && (
+        <Modal title="Hủy yêu cầu" onClose={() => { setCancelReqModal(null); setCancelReqReason(""); }} width={460}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Summary */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: T.surfaceAlt, borderRadius: T.rSm }}>
+              <div style={{ fontSize: 22 }}>{cancelReqModal.icon}</div>
               <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: T.ink }}>{s.step}</div>
-                <div style={{ fontSize: 11, color: T.inkMuted }}>{s.by} · {s.time}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: T.ink }}>{cancelReqModal.id} · {cancelReqModal.type}</div>
+                <div style={{ fontSize: 11, color: T.inkMuted }}>{cancelReqModal.date} · {cancelReqModal.desc}</div>
               </div>
+              <Badge color={stM[cancelReqModal.st]?.c} bg={stM[cancelReqModal.st]?.bg} dot style={{ marginLeft: "auto" }}>
+                {stM[cancelReqModal.st]?.l}
+              </Badge>
             </div>
-          ))}
 
-          {detailReq.st === "pending" && (
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 12 }}>
-              <Btn v="danger">Từ chối</Btn>
-              <Btn>Phê duyệt</Btn>
+            {/* Warning */}
+            <div style={{ padding: "10px 14px", background: T.warningSoft, border: `1px solid ${T.warning}30`, borderRadius: T.rSm, display: "flex", gap: 8, alignItems: "flex-start" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.warning} strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 1 }}>
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              <span style={{ fontSize: 12, color: T.warning }}>
+                Yêu cầu đã được duyệt. Việc hủy cần được người phê duyệt xác nhận. Trạng thái sẽ chuyển sang <b>Chờ duyệt hủy</b>.
+              </span>
             </div>
-          )}
+
+            {/* Reason — required */}
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>
+                Lý do hủy yêu cầu *
+                <span style={{ color: T.danger, marginLeft: 4 }}>(Bắt buộc)</span>
+              </label>
+              <textarea rows={4} placeholder="Nhập lý do hủy yêu cầu..."
+                value={cancelReqReason} onChange={e => setCancelReqReason(e.target.value)}
+                style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1.5px solid ${cancelReqReason ? T.primary : T.border}`, fontSize: 13, fontFamily: T.fontB, resize: "vertical", boxSizing: "border-box", outline: "none" }} />
+              {!cancelReqReason.trim() && (
+                <div style={{ fontSize: 11, color: T.danger, marginTop: 4 }}>⚠ Vui lòng nhập lý do hủy</div>
+              )}
+            </div>
+
+            {/* Notify */}
+            <div style={{ padding: "8px 12px", background: T.infoSoft, borderRadius: T.rSm, fontSize: 11, color: T.info }}>
+              📧 Thông báo sẽ được gửi tới: <b>{cancelReqModal.approver}</b>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 4, borderTop: `1px solid ${T.borderLight}` }}>
+              <Btn v="secondary" onClick={() => { setCancelReqModal(null); setCancelReqReason(""); }}>Quay lại</Btn>
+              <Btn v="danger" onClick={() => {
+                if (!cancelReqReason.trim()) return;
+                const h = { step: "Yêu cầu hủy", by: cancelReqModal.by, time: "Vừa xong", cancel: true };
+                setReqs(prev => prev.map(r => r.id === cancelReqModal.id
+                  ? { ...r, st: "pending_cancel", cancelReason: cancelReqReason, history: [...(r.history||[]), h] }
+                  : r));
+                setCancelReqModal(null); setCancelReqReason(""); setDetailReq(null);
+              }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                Xác nhận hủy yêu cầu
+              </Btn>
+            </div>
+          </div>
         </Modal>
       )}
     </div>
