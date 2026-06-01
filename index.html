@@ -384,6 +384,49 @@ const TopBar = ({ title, subtitle, actions, breadcrumb }) => (
 // ============================================================
 
 // --- DASHBOARD ---
+// ── Module-level OT defaults (shared across components) ──────────
+const DEFAULT_OT_CONFIG = {
+  dayShiftStart: "06:00",
+  dayShiftEnd:   "22:00",
+  rates: {
+    workday: { day: 150, night: 210 },
+    weekend: { day: 200, night: 270 },
+    holiday: { day: 300, night: 390 },
+  },
+};
+
+const calcConvertedOt = (startTime, endTime, dateStr, cfg = DEFAULT_OT_CONFIG) => {
+  if (!startTime || !endTime || !dateStr) return null;
+  const [sh, sm] = startTime.split(":").map(Number);
+  const [eh, em] = endTime.split(":").map(Number);
+  const startMin = sh * 60 + sm;
+  const endMin   = eh * 60 + em;
+  if (endMin <= startMin) return null;
+  const actualMins = endMin - startMin;
+
+  const [dsh, dsm] = cfg.dayShiftStart.split(":").map(Number);
+  const [deh, dem] = cfg.dayShiftEnd.split(":").map(Number);
+  const dayStart = dsh * 60 + dsm;
+  const dayEnd   = deh * 60 + dem;
+
+  const overlapStart = Math.max(startMin, dayStart);
+  const overlapEnd   = Math.min(endMin,   dayEnd);
+  const dayMins      = Math.max(0, overlapEnd - overlapStart);
+  const nightMins    = actualMins - dayMins;
+
+  const d = new Date(dateStr);
+  const dow = d.getDay();
+  const dayType = dow === 0 || dow === 6 ? "weekend" : "workday";
+  const rates = cfg.rates[dayType];
+
+  const convertedMins = dayMins * (rates.day / 100) + nightMins * (rates.night / 100);
+  return {
+    actualMins, dayMins, nightMins, dayType,
+    dayRate: rates.day, nightRate: rates.night,
+    convertedMins: Math.round(convertedMins),
+  };
+};
+
 const DashboardPage = ({ onNav }) => {
   const pending = [
     { name: "Nguyễn Văn An", type: "Phép năm", days: "2 ngày", date: "15-16/04", urgent: false },
@@ -3126,6 +3169,11 @@ const WorkflowPage = () => {
   const [cancelReqReason, setCancelReqReason] = useState("");
   const IS_REQ_MANAGER = true; // Simulated — approver sees Approve/Reject Cancel
 
+  // ── OT form local states (top-level, no hooks inside IIFE) ──
+  const [otDate,  setOtDate]  = useState("");
+  const [otStart, setOtStart] = useState("17:00");
+  const [otEnd,   setOtEnd]   = useState("21:30");
+
   const reqTypes = [
     { id: "wfh", icon: "🏠", label: "WFH (Làm từ xa)", desc: "Làm việc tại nhà hoặc ngoài văn phòng", color: T.primary },
     { id: "ot", icon: "⏰", label: "Làm thêm giờ (OT)", desc: "Đăng ký làm thêm ngoài giờ", color: T.accent },
@@ -3370,36 +3418,111 @@ const WorkflowPage = () => {
         </Modal>
       )}
 
-      {modal && modal.type === "ot" && (
-        <Modal title="⏰ Đăng ký làm thêm giờ (OT)" onClose={() => setModal(null)} width={500}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <Input label="Ngày OT *" type="date" />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <Input label="Giờ bắt đầu OT *" type="time" value="17:00" />
-              <Input label="Giờ kết thúc OT *" type="time" value="21:30" />
-            </div>
-            <Input label="Tổng giờ OT" value="4 giờ" readOnly style={{ background: T.surfaceAlt, fontWeight: 700, color: T.primary }} />
-            <Input label="Dự án / Công việc *" placeholder="VD: Deploy release v2.3" />
-            <div><label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Nội dung công việc OT *</label><textarea rows={3} placeholder="Mô tả chi tiết công việc cần OT..." style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, resize: "vertical", boxSizing: "border-box" }} /></div>
-            <div style={{ padding: "10px 14px", background: T.warningSoft, borderRadius: T.r, fontSize: 12, color: T.warning }}>
-              ⚠ OT cần được phê duyệt trước khi thực hiện. Hệ số OT ngày thường: 150%.
-            </div>
-            <div style={{ padding: "10px 14px", background: T.surfaceAlt, borderRadius: T.r, fontSize: 12 }}>
-              <div style={{ fontWeight: 600, color: T.ink, marginBottom: 4 }}>Luồng phê duyệt</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <Badge color={T.info} bg={T.infoSoft}>Bạn</Badge><span style={{ color: T.inkMuted }}>→</span>
-                <Badge color={T.primary} bg={T.primarySoft}>Manager</Badge><span style={{ color: T.inkMuted }}>→</span>
-                <Badge color="#E11D48" bg="#FFF1F2">HR</Badge><span style={{ color: T.inkMuted }}>→</span>
-                <Badge color={T.success} bg={T.successSoft}>✓</Badge>
+      {modal && modal.type === "ot" && (() => {
+        const fmtMins = (m) => {
+          if (!m) return "0 phút";
+          const h = Math.floor(m / 60), min = m % 60;
+          if (h === 0) return `${min} phút`;
+          return min > 0 ? `${h} giờ ${min} phút` : `${h} giờ`;
+        };
+        const startMin = otStart ? (() => { const [h,m]=otStart.split(":").map(Number); return h*60+m; })() : 0;
+        const endMin   = otEnd   ? (() => { const [h,m]=otEnd.split(":").map(Number);   return h*60+m; })() : 0;
+        const actualMins = (startMin && endMin && endMin > startMin) ? endMin - startMin : 0;
+        const conv = otDate && actualMins > 0 ? calcConvertedOt(otStart, otEnd, otDate, DEFAULT_OT_CONFIG) : null;
+
+        return (
+          <Modal title="⏰ Đăng ký làm thêm giờ (OT)" onClose={() => setModal(null)} width={520}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {/* Date + times */}
+              <Input label="Ngày OT *" type="date" value={otDate} onChange={e => setOtDate(e.target.value)} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Giờ bắt đầu OT *</label>
+                  <input type="time" value={otStart} onChange={e => setOtStart(e.target.value)}
+                    style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1.5px solid ${T.primary}`, fontSize: 13, fontFamily: T.fontM, fontWeight: 600, color: T.ink, boxSizing: "border-box", outline: "none" }} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Giờ kết thúc OT *</label>
+                  <input type="time" value={otEnd} onChange={e => setOtEnd(e.target.value)}
+                    style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1.5px solid ${T.primary}`, fontSize: 13, fontFamily: T.fontM, fontWeight: 600, color: T.ink, boxSizing: "border-box", outline: "none" }} />
+                </div>
+              </div>
+
+              {/* ── OT Calculation Summary ── */}
+              <div style={{ borderRadius: T.r, border: `1.5px solid ${conv ? T.primary + "40" : T.border}`, overflow: "hidden", transition: "border 0.15s" }}>
+                <div style={{ padding: "10px 14px", background: conv ? T.primarySoft : T.surfaceAlt, borderBottom: `1px solid ${conv ? T.primary + "20" : T.borderLight}`, display: "flex", alignItems: "center", gap: 7 }}>
+                  <span style={{ fontSize: 14 }}>⏱</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: conv ? T.primary : T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>OT Hours Calculation</span>
+                  {conv && (
+                    <span style={{ marginLeft: "auto", fontSize: 10, padding: "2px 8px", borderRadius: T.rFull, background: T.primary, color: "white", fontWeight: 700 }}>
+                      {conv.dayType === "workday" ? "Ngày thường" : conv.dayType === "weekend" ? "Cuối tuần" : "Ngày lễ"}
+                    </span>
+                  )}
+                </div>
+
+                {conv ? (
+                  <div style={{ padding: "14px 16px" }}>
+                    {/* 3-col breakdown */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0, borderRadius: T.rSm, overflow: "hidden", border: `1px solid ${T.border}`, marginBottom: 12 }}>
+                      {[
+                        { label: "Actual OT",     value: fmtMins(conv.actualMins),      sub: "Thời gian thực tế", color: T.ink,    bg: "white"       },
+                        { label: "OT Rate",        value: `${conv.dayMins > 0 ? conv.dayRate : conv.nightRate}%`, sub: `${conv.dayMins > 0 ? "☀️ Ca ngày" : "🌙 Ca đêm"}`, color: T.accent, bg: T.accentSoft  },
+                        { label: "Converted OT",  value: fmtMins(conv.convertedMins),   sub: "Giờ OT quy đổi",   color: T.primary, bg: T.primarySoft },
+                      ].map((c, i) => (
+                        <div key={i} style={{ padding: "12px 14px", background: c.bg, borderLeft: i > 0 ? `1px solid ${T.border}` : "none", textAlign: "center" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>{c.label}</div>
+                          <div style={{ fontSize: 17, fontWeight: 800, fontFamily: T.fontD, color: c.color, lineHeight: 1.1 }}>{c.value}</div>
+                          <div style={{ fontSize: 10, color: T.inkMuted, marginTop: 3 }}>{c.sub}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Breakdown if mixed shifts */}
+                    {conv.dayMins > 0 && conv.nightMins > 0 && (
+                      <div style={{ padding: "8px 12px", background: T.surfaceAlt, borderRadius: T.rSm, fontSize: 11, color: T.inkSoft }}>
+                        <div style={{ fontWeight: 600, color: T.ink, marginBottom: 4 }}>Chi tiết theo ca:</div>
+                        <div style={{ display: "flex", gap: 12 }}>
+                          <span>☀️ Ca ngày: {fmtMins(conv.dayMins)} × {conv.dayRate}% = <b style={{ color: T.primary }}>{fmtMins(Math.round(conv.dayMins * conv.dayRate / 100))}</b></span>
+                          <span>🌙 Ca đêm: {fmtMins(conv.nightMins)} × {conv.nightRate}% = <b style={{ color: "#6366F1" }}>{fmtMins(Math.round(conv.nightMins * conv.nightRate / 100))}</b></span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ padding: "18px", textAlign: "center", color: T.inkMuted, fontSize: 12 }}>
+                    {!otDate ? "Chọn ngày OT để tính tỷ lệ tự động" : !actualMins ? "Nhập giờ bắt đầu & kết thúc hợp lệ" : "Đang tính..."}
+                  </div>
+                )}
+              </div>
+
+              <Input label="Dự án / Công việc *" placeholder="VD: Deploy release v2.3" />
+              <div>
+                <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Nội dung công việc OT *</label>
+                <textarea rows={3} placeholder="Mô tả chi tiết công việc cần OT..." style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, resize: "vertical", boxSizing: "border-box" }} />
+              </div>
+
+              <div style={{ padding: "10px 14px", background: T.warningSoft, borderRadius: T.r, fontSize: 12, color: T.warning }}>
+                ⚠ OT cần được phê duyệt trước khi thực hiện.
+              </div>
+
+              <div style={{ padding: "10px 14px", background: T.surfaceAlt, borderRadius: T.r, fontSize: 12 }}>
+                <div style={{ fontWeight: 600, color: T.ink, marginBottom: 4 }}>Luồng phê duyệt</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Badge color={T.info} bg={T.infoSoft}>Bạn</Badge><span style={{ color: T.inkMuted }}>→</span>
+                  <Badge color={T.primary} bg={T.primarySoft}>Manager</Badge><span style={{ color: T.inkMuted }}>→</span>
+                  <Badge color="#E11D48" bg="#FFF1F2">HR</Badge><span style={{ color: T.inkMuted }}>→</span>
+                  <Badge color={T.success} bg={T.successSoft}>✓</Badge>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 10, justifyContent: "space-between" }}>
+                <Btn v="ghost" onClick={() => setModal("select")}>← Chọn lại</Btn>
+                <div style={{ display: "flex", gap: 10 }}><Btn v="secondary" onClick={() => setModal(null)}>Hủy</Btn><Btn>Gửi yêu cầu</Btn></div>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 10, justifyContent: "space-between" }}>
-              <Btn v="ghost" onClick={() => setModal("select")}>← Chọn lại</Btn>
-              <div style={{ display: "flex", gap: 10 }}><Btn v="secondary" onClick={() => setModal(null)}>Hủy</Btn><Btn>Gửi yêu cầu</Btn></div>
-            </div>
-          </div>
-        </Modal>
-      )}
+          </Modal>
+        );
+      })()}
 
       {modal && modal.type === "travel" && (
         <Modal title="✈️ Đề xuất công tác" onClose={() => setModal(null)} width={540}>
@@ -4906,6 +5029,34 @@ const SettingsPage = () => {
   const [editingMatrix, setEditingMatrix] = useState(false);
   const [wfSearch, setWfSearch] = useState("");
 
+  // ── OT Configuration ────────────────────────────────────────
+  const [otConfig, setOtConfig] = useState(DEFAULT_OT_CONFIG);
+  const [otConfigDraft,   setOtConfigDraft]   = useState(null); // editing copy
+  const [otSaveSuccess,   setOtSaveSuccess]   = useState(false);
+
+  const startEditOt = () => setOtConfigDraft(JSON.parse(JSON.stringify(otConfig)));
+  const cancelEditOt = () => { setOtConfigDraft(null); setOtSaveSuccess(false); };
+
+  const saveOtConfig = () => {
+    // Validation: rates > 0, no empty
+    const r = otConfigDraft.rates;
+    for (const k of ["workday","weekend","holiday"])
+      for (const s of ["day","night"])
+        if (!r[k][s] || r[k][s] <= 0) return;
+    setOtConfig(JSON.parse(JSON.stringify(otConfigDraft)));
+    setOtConfigDraft(null);
+    setOtSaveSuccess(true);
+    setTimeout(() => setOtSaveSuccess(false), 3000);
+  };
+
+  const updateRate = (dayType, shift, val) =>
+    setOtConfigDraft(p => ({ ...p, rates: { ...p.rates, [dayType]: { ...p.rates[dayType], [shift]: Number(val) || 0 } } }));
+
+  // Night shift auto-calc from day shift
+  const nightShiftStr = (cfg) => `${cfg.dayShiftEnd} → ${cfg.dayShiftStart} (+1 ngày)`;
+
+  // OT hours converter — uses module-level calcConvertedOt
+
   // ── Notification Management (System) ────────────────────────
   const allMembers  = ["Nguyễn Văn An","Lê Thị Mai","Trần Đức Hùng","Phạm Minh Tuấn","Hoàng Thị Lan","Vũ Đức Minh","Đỗ Thị Hương","Bùi Quang Hải"];
   const allDeptList = ["Engineering","Design","QA","HR","Kế toán","Ban lãnh đạo"];
@@ -5090,6 +5241,7 @@ const SettingsPage = () => {
     { id: "leave",    label: "Chính sách phép",     icon: "📋" },
     { id: "approval", label: "Approval Workflow",   icon: "✅" },
     { id: "roles",    label: "Roles & Permissions", icon: "🔐" },
+    { id: "otconfig", label: "OT Configuration",   icon: "⏱" },
     { id: "notify",   label: "Notification",        icon: "🔔" },
   ];
   const personalTabs = [
@@ -6646,6 +6798,220 @@ const SettingsPage = () => {
               )}
             </>
           )}
+
+          {/* ──────────────── OT CONFIGURATION ──────────────── */}
+          {effectiveTab === "otconfig" && isAdmin && (() => {
+            const cfg = otConfigDraft || otConfig;
+            const editing = !!otConfigDraft;
+
+            const DAY_TYPES = [
+              { key: "workday", label: "Ngày làm việc",  icon: "💼", color: T.primary  },
+              { key: "weekend", label: "Cuối tuần",       icon: "🏖", color: T.accent   },
+              { key: "holiday", label: "Ngày lễ / Tết",  icon: "🎉", color: T.danger   },
+            ];
+
+            // Validation helpers
+            const rateErr = (val) => !val || val <= 0 ? "Bắt buộc > 0" : null;
+            const nightLowerWarning = (dayType) =>
+              cfg.rates[dayType].night < cfg.rates[dayType].day;
+            const anyRateErr = Object.keys(cfg.rates).some(k =>
+              rateErr(cfg.rates[k].day) || rateErr(cfg.rates[k].night)
+            );
+
+            return (
+              <>
+                {/* Header */}
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
+                  <div>
+                    <h3 style={{ fontFamily: T.fontD, fontSize: 17, fontWeight: 800, margin: "0 0 4px", color: T.ink }}>OT Configuration</h3>
+                    <p style={{ fontSize: 12, color: T.inkMuted, margin: 0 }}>Cấu hình khung giờ ca làm việc và tỷ lệ lương làm thêm giờ</p>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {!editing ? (
+                      <Btn onClick={startEditOt}>
+                        <Ico d={IC.edit} size={14} /> Chỉnh sửa
+                      </Btn>
+                    ) : (
+                      <>
+                        <Btn v="secondary" onClick={cancelEditOt}>Hủy</Btn>
+                        <Btn onClick={saveOtConfig} disabled={anyRateErr}>
+                          <Ico d={IC.check} size={14} /> Lưu thay đổi
+                        </Btn>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Save success toast */}
+                {otSaveSuccess && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", background: T.successSoft, border: `1px solid ${T.success}30`, borderRadius: T.rSm }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.success} strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span style={{ fontSize: 12, color: T.success, fontWeight: 600 }}>OT configuration has been updated successfully.</span>
+                  </div>
+                )}
+
+                {/* ── Section A: Shift Time ── */}
+                <Card>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: T.rSm, background: T.primarySoft, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🕐</div>
+                    <div>
+                      <div style={{ fontFamily: T.fontD, fontSize: 14, fontWeight: 700, color: T.ink }}>Section A — Shift Time Configuration</div>
+                      <div style={{ fontSize: 11, color: T.inkMuted }}>Cấu hình khung giờ ca ngày và ca đêm</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+                    {/* Day Shift */}
+                    <div style={{ padding: "16px", borderRadius: T.r, border: `1.5px solid ${T.primary}40`, background: T.primarySoft }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
+                        <span style={{ fontSize: 16 }}>☀️</span>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: T.primary }}>Day Shift</div>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                        <div>
+                          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>Start Time</label>
+                          <input type="time" value={cfg.dayShiftStart}
+                            onChange={e => editing && setOtConfigDraft(p => ({ ...p, dayShiftStart: e.target.value }))}
+                            disabled={!editing}
+                            style={{ width: "100%", padding: "8px 10px", borderRadius: T.rSm, border: `1.5px solid ${editing ? T.primary : T.border}`, fontSize: 14, fontFamily: T.fontM, fontWeight: 700, color: T.primary, background: editing ? "white" : T.primarySoft, boxSizing: "border-box", outline: "none", cursor: editing ? "text" : "default" }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 5 }}>End Time</label>
+                          <input type="time" value={cfg.dayShiftEnd}
+                            onChange={e => editing && setOtConfigDraft(p => ({ ...p, dayShiftEnd: e.target.value }))}
+                            disabled={!editing}
+                            style={{ width: "100%", padding: "8px 10px", borderRadius: T.rSm, border: `1.5px solid ${editing ? T.primary : T.border}`, fontSize: 14, fontFamily: T.fontM, fontWeight: 700, color: T.primary, background: editing ? "white" : T.primarySoft, boxSizing: "border-box", outline: "none", cursor: editing ? "text" : "default" }}
+                          />
+                        </div>
+                      </div>
+                      {/* Visual bar */}
+                      <div style={{ marginTop: 12, height: 8, borderRadius: T.rFull, background: `linear-gradient(90deg, ${T.primary} 0%, ${T.primary} 100%)`, position: "relative", overflow: "visible" }}>
+                        <div style={{ position: "absolute", top: 12, left: 0, fontSize: 10, color: T.primary, fontWeight: 700 }}>{cfg.dayShiftStart}</div>
+                        <div style={{ position: "absolute", top: 12, right: 0, fontSize: 10, color: T.primary, fontWeight: 700 }}>{cfg.dayShiftEnd}</div>
+                      </div>
+                    </div>
+
+                    {/* Night Shift — auto calculated */}
+                    <div style={{ padding: "16px", borderRadius: T.r, border: `1.5px solid #6366F130`, background: "#F5F3FF" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
+                        <span style={{ fontSize: 16 }}>🌙</span>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#6366F1" }}>Night Shift</div>
+                        <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: T.rFull, background: "#EDE9FE", color: "#6366F1", fontWeight: 600, marginLeft: "auto" }}>Auto calculated</span>
+                      </div>
+                      <div style={{ padding: "12px 14px", background: "#EDE9FE", borderRadius: T.rSm, fontSize: 13, fontFamily: T.fontM, fontWeight: 700, color: "#5B21B6", textAlign: "center" }}>
+                        {cfg.dayShiftEnd} → {cfg.dayShiftStart}
+                        <div style={{ fontSize: 10, fontWeight: 400, color: "#6D28D9", marginTop: 2 }}>+1 ngày hôm sau</div>
+                      </div>
+                      <div style={{ marginTop: 10, fontSize: 11, color: "#7C3AED", lineHeight: 1.5 }}>
+                        Ca đêm được tính tự động là khoảng thời gian còn lại trong ngày sau khi trừ đi ca ngày.
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* ── Section B: OT Rates ── */}
+                <Card style={{ padding: 0, overflow: "hidden" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "16px 20px", borderBottom: `1px solid ${T.borderLight}` }}>
+                    <div style={{ width: 32, height: 32, borderRadius: T.rSm, background: T.accentSoft, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>💰</div>
+                    <div>
+                      <div style={{ fontFamily: T.fontD, fontSize: 14, fontWeight: 700, color: T.ink }}>Section B — Overtime Rate Configuration</div>
+                      <div style={{ fontSize: 11, color: T.inkMuted }}>Tỷ lệ % lương OT theo loại ngày và loại ca</div>
+                    </div>
+                  </div>
+
+                  {/* Table header */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 140px 140px", background: T.surfaceAlt, borderBottom: `1px solid ${T.border}`, padding: "10px 20px", gap: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>Loại ngày</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: T.primary, textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                      <span>☀️</span> Day Shift (%)
+                    </div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#6366F1", textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                      <span>🌙</span> Night Shift (%)
+                    </div>
+                  </div>
+
+                  {DAY_TYPES.map(({ key, label, icon, color }, ri) => {
+                    const nightWarn = nightLowerWarning(key);
+                    return (
+                      <div key={key} style={{ display: "grid", gridTemplateColumns: "1fr 140px 140px", padding: "14px 20px", gap: 12, borderBottom: ri < 2 ? `1px solid ${T.borderLight}` : "none", alignItems: "center", background: ri % 2 === 0 ? "white" : T.surfaceAlt }}>
+                        {/* Day type label */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: T.rSm, background: `${color}18`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{icon}</div>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: T.ink }}>{label}</div>
+                            {nightWarn && !editing && (
+                              <div style={{ fontSize: 10, color: T.warning, marginTop: 2 }}>⚠ Night rate thấp hơn Day rate</div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Day Shift rate */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "center" }}>
+                          {editing ? (
+                            <input type="number" min="1" value={otConfigDraft.rates[key].day}
+                              onChange={e => updateRate(key, "day", e.target.value)}
+                              style={{ width: 72, padding: "7px 10px", borderRadius: T.rSm, border: `1.5px solid ${T.primary}`, fontSize: 14, fontFamily: T.fontM, fontWeight: 700, color: T.primary, textAlign: "center", outline: "none" }}
+                            />
+                          ) : (
+                            <div style={{ padding: "6px 16px", borderRadius: T.rSm, background: T.primarySoft, border: `1px solid ${T.primary}30`, fontSize: 15, fontFamily: T.fontM, fontWeight: 800, color: T.primary }}>
+                              {cfg.rates[key].day}%
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Night Shift rate */}
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                          {editing ? (
+                            <>
+                              <input type="number" min="1" value={otConfigDraft.rates[key].night}
+                                onChange={e => updateRate(key, "night", e.target.value)}
+                                style={{ width: 72, padding: "7px 10px", borderRadius: T.rSm, border: `1.5px solid ${nightWarn ? T.warning : "#6366F1"}`, fontSize: 14, fontFamily: T.fontM, fontWeight: 700, color: "#6366F1", textAlign: "center", outline: "none" }}
+                              />
+                              {nightWarn && (
+                                <div style={{ fontSize: 10, color: T.warning, textAlign: "center" }}>⚠ Thấp hơn Day rate</div>
+                              )}
+                            </>
+                          ) : (
+                            <div style={{ padding: "6px 16px", borderRadius: T.rSm, background: "#EDE9FE", border: `1px solid #6366F130`, fontSize: 15, fontFamily: T.fontM, fontWeight: 800, color: "#6366F1" }}>
+                              {cfg.rates[key].night}%
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Footer: quick preview */}
+                  <div style={{ padding: "12px 20px", background: T.surfaceAlt, borderTop: `1px solid ${T.border}` }}>
+                    <div style={{ fontSize: 11, color: T.inkMuted, marginBottom: 8, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Ví dụ tính OT realtime</div>
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                      {[
+                        { h: 2, type: "workday", shift: "day",   label: "2h ngày thường / Ca ngày"  },
+                        { h: 3, type: "weekend", shift: "night",  label: "3h cuối tuần / Ca đêm"     },
+                        { h: 8, type: "holiday", shift: "day",   label: "8h ngày lễ / Ca ngày"       },
+                      ].map((ex, i) => {
+                        const r = cfg.rates[ex.type][ex.shift];
+                        const conv = Math.round(ex.h * r) / 100;
+                        return (
+                          <div key={i} style={{ padding: "8px 14px", background: "white", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 11 }}>
+                            <div style={{ color: T.inkMuted, marginBottom: 3 }}>{ex.label}</div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <span style={{ fontWeight: 600, color: T.ink }}>{ex.h}h thực tế</span>
+                              <span style={{ color: T.inkMuted }}>×</span>
+                              <span style={{ fontWeight: 700, color: T.accent }}>{r}%</span>
+                              <span style={{ color: T.inkMuted }}>=</span>
+                              <span style={{ fontWeight: 800, color: T.primary, fontFamily: T.fontM }}>{conv}h quy đổi</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </Card>
+              </>
+            );
+          })()}
 
           {/* ──────────────── NOTIFICATION MANAGEMENT ──────────────── */}
           {effectiveTab === "notify" && isAdmin && (
