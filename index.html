@@ -600,6 +600,17 @@ const DashboardPage = ({ onNav }) => {
 // --- LEAVE PAGE (MVP) ---
 const LeavePage = ({ onNav }) => {
   const [tab, setTab] = useState("requests");
+
+  // ── Team Leave Calendar states ────────────────────────────────
+  const today2 = new Date();
+  const [calMonth, setCalMonth] = useState(today2.getMonth());
+  const [calYear,  setCalYear]  = useState(today2.getFullYear());
+  const [calView,  setCalView]  = useState("month");   // "month" | "week"
+  const [calDept,  setCalDept]  = useState("all");
+  const [calSt,    setCalSt]    = useState("all");
+  const [calType,  setCalType]  = useState("all");
+  const [calName,  setCalName]  = useState("");
+  const [calDayPop,setCalDayPop]= useState(null);      // {date, leaves, holiday}
   const [modal, setModal] = useState(null); // null | "new" | request obj
   const [editLeavePolicy, setEditLeavePolicy] = useState(null);
 
@@ -1058,15 +1069,293 @@ const LeavePage = ({ onNav }) => {
         </Card>
       )}
 
-      {tab === "team" && (
-        <Card>
-          <div style={{ textAlign: "center", padding: 40, color: T.inkMuted }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>📅</div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: T.ink, marginBottom: 4 }}>Lịch nghỉ team — Tháng 4/2026</div>
-            <div style={{ fontSize: 12 }}>Hiển thị lịch nghỉ phép toàn bộ team theo dạng calendar view — tích hợp Google Calendar</div>
-          </div>
-        </Card>
-      )}
+      {tab === "team" && (() => {
+        const MONTHS = ["Tháng 1","Tháng 2","Tháng 3","Tháng 4","Tháng 5","Tháng 6","Tháng 7","Tháng 8","Tháng 9","Tháng 10","Tháng 11","Tháng 12"];
+        const DNAMES = ["CN","T2","T3","T4","T5","T6","T7"];
+        const DEPTS  = ["Engineering","Design","QA","HR","Kế toán","DevOps"];
+        const LEAVE_TYPES = [...new Set(requests.map(r => r.type))];
+
+        const HOLIDAYS_CAL = [
+          { date: "2026-04-30", name: "30/4 — Giải phóng miền Nam",  color: "#6366F1", bg: "#EDE9FE" },
+          { date: "2026-05-01", name: "01/5 — Quốc tế Lao động",     color: "#6366F1", bg: "#EDE9FE" },
+          { date: "2026-06-01", name: "01/6 — Ngày Quốc tế Thiếu nhi",color: "#EC4899", bg: "#FDF4FF" },
+        ];
+
+        const ST_COLORS = {
+          approved:       { dot: T.success,  bg: T.successSoft,  label: "Đã duyệt"      },
+          pending:        { dot: T.warning,  bg: T.warningSoft,  label: "Chờ duyệt"     },
+          rejected:       { dot: T.danger,   bg: T.dangerSoft,   label: "Từ chối"        },
+          pending_cancel: { dot: "#D97706",  bg: "#FEF3C7",      label: "Chờ duyệt hủy" },
+          cancelled:      { dot: T.inkMuted, bg: T.surfaceAlt,   label: "Đã hủy"         },
+        };
+
+        // Build map: "YYYY-MM-DD" → [{request, rangeFrom, rangeTo}]
+        const leaveMap = {};
+        const addDay = (dateStr, entry) => {
+          if (!leaveMap[dateStr]) leaveMap[dateStr] = [];
+          leaveMap[dateStr].push(entry);
+        };
+
+        requests.forEach(r => {
+          const ranges = r.ranges || [{ from: r.fromDt||"", to: r.toDt||"" }];
+          ranges.forEach(rng => {
+            if (!rng.from) return;
+            const f = new Date(rng.from);
+            const t = rng.to ? new Date(rng.to) : f;
+            const cur = new Date(f);
+            cur.setHours(0,0,0,0);
+            const end = new Date(t); end.setHours(0,0,0,0);
+            while (cur <= end) {
+              const key = cur.toISOString().slice(0,10);
+              addDay(key, { req: r, from: rng.from, to: rng.to });
+              cur.setDate(cur.getDate()+1);
+            }
+          });
+        });
+
+        // Filter
+        const filterLeave = (entries) => entries.filter(e => {
+          if (calSt   !== "all" && e.req.status !== calSt)   return false;
+          if (calType !== "all" && e.req.type   !== calType)  return false;
+          if (calDept !== "all" && e.req.dept   !== calDept)  return false;
+          if (calName && !e.req.name.toLowerCase().includes(calName.toLowerCase())) return false;
+          return true;
+        });
+
+        // Calendar grid
+        const firstDay = new Date(calYear, calMonth, 1).getDay();
+        const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+        const todayStr = new Date().toISOString().slice(0,10);
+        const navMonth = d => {
+          const nd = new Date(calYear, calMonth+d);
+          setCalMonth(nd.getMonth()); setCalYear(nd.getFullYear());
+        };
+
+        const MAX_SHOW = 3;
+
+        return (
+          <>
+            {/* ── Toolbar ── */}
+            <div style={{ display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:2 }}>
+              {/* Month nav */}
+              <div style={{ display:"flex",alignItems:"center",gap:6 }}>
+                <button onClick={()=>navMonth(-1)} style={{ width:30,height:30,borderRadius:T.r,border:`1px solid ${T.border}`,background:T.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.inkSoft} strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <div style={{ fontFamily:T.fontD,fontSize:16,fontWeight:800,color:T.ink,minWidth:150,textAlign:"center" }}>
+                  {MONTHS[calMonth]} {calYear}
+                </div>
+                <button onClick={()=>navMonth(1)} style={{ width:30,height:30,borderRadius:T.r,border:`1px solid ${T.border}`,background:T.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center" }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.inkSoft} strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+                <button onClick={()=>{ setCalMonth(today2.getMonth()); setCalYear(today2.getFullYear()); }}
+                  style={{ padding:"5px 12px",borderRadius:T.rSm,border:`1px solid ${T.border}`,background:T.surface,fontSize:11,fontWeight:600,cursor:"pointer",color:T.inkSoft }}>
+                  Hôm nay
+                </button>
+              </div>
+
+              {/* Filters */}
+              <div style={{ display:"flex",gap:8,flexWrap:"wrap",flex:1 }}>
+                <div style={{ position:"relative" }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={T.inkMuted} strokeWidth="2.2" strokeLinecap="round" style={{position:"absolute",left:8,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}>
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                  <input type="text" placeholder="Tìm nhân viên..." value={calName} onChange={e=>setCalName(e.target.value)}
+                    style={{padding:"6px 10px 6px 26px",borderRadius:T.rSm,border:`1px solid ${calName?T.primary:T.border}`,fontSize:12,fontFamily:T.fontB,width:150,outline:"none",background:calName?T.primarySoft:T.surface}} />
+                </div>
+                {[
+                  { val:calDept, set:setCalDept, opts:[["all","Tất cả phòng ban"],...DEPTS.map(d=>[d,d])] },
+                  { val:calSt,   set:setCalSt,   opts:[["all","Tất cả trạng thái"],["approved","Đã duyệt"],["pending","Chờ duyệt"],["rejected","Từ chối"],["cancelled","Đã hủy"]] },
+                  { val:calType, set:setCalType,  opts:[["all","Tất cả loại phép"],...LEAVE_TYPES.map(t=>[t,t])] },
+                ].map((f,fi) => (
+                  <select key={fi} value={f.val} onChange={e=>f.set(e.target.value)}
+                    style={{padding:"6px 10px",borderRadius:T.rSm,border:`1px solid ${f.val!=="all"?T.primary:T.border}`,fontSize:12,fontFamily:T.fontB,color:T.ink,background:f.val!=="all"?T.primarySoft:T.surface,cursor:"pointer",outline:"none"}}>
+                    {f.opts.map(([v,l])=><option key={v} value={v}>{l}</option>)}
+                  </select>
+                ))}
+              </div>
+
+              {/* Legend */}
+              <div style={{ display:"flex",gap:10,alignItems:"center",flexShrink:0 }}>
+                {[
+                  {c:T.success, l:"Đã duyệt"},
+                  {c:T.warning, l:"Chờ duyệt"},
+                  {c:T.danger,  l:"Từ chối"},
+                  {c:"#6366F1", l:"Ngày lễ"},
+                ].map(s => (
+                  <div key={s.l} style={{display:"flex",alignItems:"center",gap:4}}>
+                    <div style={{width:8,height:8,borderRadius:"50%",background:s.c}}/>
+                    <span style={{fontSize:10,color:T.inkMuted}}>{s.l}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Calendar Grid ── */}
+            <Card style={{ padding:0,overflow:"hidden" }}>
+              {/* Day headers */}
+              <div style={{ display:"grid",gridTemplateColumns:"repeat(7,1fr)",borderBottom:`1px solid ${T.border}` }}>
+                {["CN","T2","T3","T4","T5","T6","T7"].map((d,i) => (
+                  <div key={d} style={{ padding:"8px 0",textAlign:"center",fontSize:11,fontWeight:700,color:i===0||i===6?T.inkMuted:T.inkSoft,background:T.surfaceAlt,borderLeft:i>0?`1px solid ${T.borderLight}`:"none",textTransform:"uppercase",letterSpacing:"0.04em" }}>{d}</div>
+                ))}
+              </div>
+
+              {/* Calendar cells */}
+              <div style={{ display:"grid",gridTemplateColumns:"repeat(7,1fr)" }}>
+                {/* Empty leading cells */}
+                {Array.from({length:firstDay}).map((_,i) => (
+                  <div key={`e${i}`} style={{ minHeight:110,background:"#F8F9FA",borderRight:`1px solid ${T.borderLight}`,borderBottom:`1px solid ${T.borderLight}` }} />
+                ))}
+
+                {/* Day cells */}
+                {Array.from({length:daysInMonth}).map((_,di) => {
+                  const dayNum  = di+1;
+                  const dateStr = `${calYear}-${String(calMonth+1).padStart(2,"0")}-${String(dayNum).padStart(2,"0")}`;
+                  const isToday = dateStr === todayStr;
+                  const isWE    = new Date(dateStr).getDay() === 0 || new Date(dateStr).getDay() === 6;
+                  const holiday = HOLIDAYS_CAL.find(h => h.date === dateStr);
+                  const rawEntries = leaveMap[dateStr] || [];
+                  const entries = filterLeave(rawEntries);
+                  const col    = (di + firstDay) % 7;
+                  const hasContent = holiday || entries.length > 0;
+
+                  return (
+                    <div key={dayNum}
+                      onClick={() => hasContent && setCalDayPop({ date: dateStr, entries, holiday })}
+                      style={{ minHeight:110,padding:"6px 8px",borderLeft:col>0?`1px solid ${T.borderLight}`:"none",borderBottom:`1px solid ${T.borderLight}`,background:isWE?"#F8F9FB":isToday?`${T.primary}06`:"white",cursor:hasContent?"pointer":"default",transition:"background 0.1s",position:"relative" }}
+                      onMouseEnter={e=>{ if(hasContent) e.currentTarget.style.background=isWE?"#F0F2F8":`${T.primary}0A`; }}
+                      onMouseLeave={e=>{ e.currentTarget.style.background=isWE?"#F8F9FB":isToday?`${T.primary}06`:"white"; }}
+                    >
+                      {/* Day number */}
+                      <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4 }}>
+                        <span style={{ width:24,height:24,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:isToday?700:500,color:isToday?"white":isWE?T.inkMuted:T.ink,background:isToday?T.primary:"transparent" }}>
+                          {dayNum}
+                        </span>
+                        {entries.length > 0 && (
+                          <span style={{ fontSize:9,fontWeight:700,color:T.inkMuted }}>{entries.length}👤</span>
+                        )}
+                      </div>
+
+                      {/* Holiday chip */}
+                      {holiday && (
+                        <div style={{ marginBottom:3,padding:"2px 6px",borderRadius:T.rSm,background:holiday.bg,border:`1px solid ${holiday.color}30`,fontSize:9,fontWeight:700,color:holiday.color,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
+                          🎉 {holiday.name.split("—")[0].trim()}
+                        </div>
+                      )}
+
+                      {/* Leave entries */}
+                      {entries.slice(0, MAX_SHOW).map((e, ei) => {
+                        const sc = ST_COLORS[e.req.status] || { dot:T.inkMuted, bg:T.surfaceAlt };
+                        const nameShort = e.req.name.split(" ").slice(-1)[0];
+                        return (
+                          <div key={ei} style={{ display:"flex",alignItems:"center",gap:4,padding:"2px 5px",borderRadius:T.rSm,background:sc.bg,marginBottom:2,overflow:"hidden" }}>
+                            <div style={{ width:6,height:6,borderRadius:"50%",background:sc.dot,flexShrink:0 }}/>
+                            <span style={{ fontSize:9,fontWeight:600,color:sc.dot,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1 }}>{nameShort}</span>
+                          </div>
+                        );
+                      })}
+                      {entries.length > MAX_SHOW && (
+                        <div style={{ fontSize:9,color:T.inkMuted,fontWeight:600,padding:"1px 5px" }}>+{entries.length-MAX_SHOW} more</div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Trailing empty cells */}
+                {(() => {
+                  const total = firstDay + daysInMonth;
+                  const trail = (7 - (total % 7)) % 7;
+                  return Array.from({length:trail}).map((_,i) => (
+                    <div key={`t${i}`} style={{ minHeight:110,background:"#F8F9FA",borderLeft:`1px solid ${T.borderLight}`,borderBottom:`1px solid ${T.borderLight}` }} />
+                  ));
+                })()}
+              </div>
+            </Card>
+
+            {/* ── Month summary strip ── */}
+            <div style={{ display:"flex",gap:12,flexWrap:"wrap" }}>
+              {[
+                { label:"Tổng đơn tháng này", value: (() => { const keys=Object.keys(leaveMap).filter(k=>k.startsWith(`${calYear}-${String(calMonth+1).padStart(2,"0")}`)); return new Set(keys.flatMap(k=>filterLeave(leaveMap[k]).map(e=>e.req.id))).size; })(), color:T.primary },
+                { label:"Đã duyệt",  value: new Set(Object.values(leaveMap).flatMap(e=>filterLeave(e).filter(x=>x.req.status==="approved").map(x=>x.req.id))).size, color:T.success },
+                { label:"Chờ duyệt", value: new Set(Object.values(leaveMap).flatMap(e=>filterLeave(e).filter(x=>x.req.status==="pending").map(x=>x.req.id))).size,  color:T.warning },
+                { label:"Ngày lễ",   value: HOLIDAYS_CAL.filter(h=>h.date.startsWith(`${calYear}-${String(calMonth+1).padStart(2,"0")}`)).length,                     color:"#6366F1" },
+              ].map((s,i) => (
+                <div key={i} style={{ padding:"9px 16px",background:T.surface,borderRadius:T.r,border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:8 }}>
+                  <div style={{ width:7,height:7,borderRadius:"50%",background:s.color }}/>
+                  <span style={{ fontSize:12,color:T.inkSoft }}>{s.label}:</span>
+                  <span style={{ fontSize:15,fontWeight:800,fontFamily:T.fontD,color:s.color }}>{s.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* ── Day Popup ── */}
+            {calDayPop && (
+              <Modal
+                title={`${new Date(calDayPop.date).toLocaleDateString("vi-VN",{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}`}
+                onClose={()=>setCalDayPop(null)}
+                width={520}
+              >
+                <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
+                  {/* Holiday */}
+                  {calDayPop.holiday && (
+                    <div style={{ display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:T.r,background:calDayPop.holiday.bg,border:`1.5px solid ${calDayPop.holiday.color}40` }}>
+                      <span style={{fontSize:20}}>🎉</span>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:700,color:calDayPop.holiday.color}}>{calDayPop.holiday.name}</div>
+                        <div style={{fontSize:11,color:calDayPop.holiday.color,opacity:0.8}}>Ngày nghỉ lễ</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Leave table */}
+                  {calDayPop.entries.length > 0 ? (
+                    <>
+                      <div style={{fontSize:12,fontWeight:700,color:T.inkSoft,textTransform:"uppercase",letterSpacing:"0.05em"}}>
+                        {calDayPop.entries.length} nhân viên nghỉ
+                      </div>
+                      {/* Header */}
+                      <div style={{border:`1px solid ${T.border}`,borderRadius:T.rSm,overflow:"hidden"}}>
+                        <div style={{display:"grid",gridTemplateColumns:"1fr 100px 90px 90px",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,padding:"7px 12px",gap:8}}>
+                          {["Nhân viên","Loại phép","Thời lượng","Trạng thái"].map((h,i)=>(
+                            <div key={i} style={{fontSize:10,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.04em"}}>{h}</div>
+                          ))}
+                        </div>
+                        {calDayPop.entries.map((e,ei)=>{
+                          const sc = ST_COLORS[e.req.status] || {dot:T.inkMuted,bg:T.surfaceAlt,label:e.req.status};
+                          const hrs = rangeHrsLeave(e.from, e.to);
+                          return (
+                            <div key={ei} style={{display:"grid",gridTemplateColumns:"1fr 100px 90px 90px",padding:"9px 12px",gap:8,borderBottom:ei<calDayPop.entries.length-1?`1px solid ${T.borderLight}`:"none",alignItems:"center",background:ei%2===0?"white":T.surfaceAlt}}>
+                              <div style={{display:"flex",alignItems:"center",gap:7}}>
+                                {(() => {
+                                  const DC = { Engineering: T.primary, Design: "#7C3AED", QA: "#0891B2", HR: T.accent, "Kế toán": T.success, DevOps: "#059669" };
+                                  const c = DC[e.req.dept] || T.primary;
+                                  return <Avatar name={e.req.name} size={24} colors={[`${c}25`, c]} />;
+                                })()}
+                                <div>
+                                  <div style={{fontSize:12,fontWeight:600,color:T.ink}}>{e.req.name}</div>
+                                  <div style={{fontSize:10,color:T.inkMuted}}>{e.req.dept}</div>
+                                </div>
+                              </div>
+                              <span style={{fontSize:11,color:T.inkSoft}}>{e.req.type}</span>
+                              <span style={{fontSize:11,fontWeight:600,color:T.ink}}>{hrs>0?fmtHrsLeave(hrs):"Full day"}</span>
+                              <div style={{display:"flex",alignItems:"center",gap:4}}>
+                                <div style={{width:6,height:6,borderRadius:"50%",background:sc.dot,flexShrink:0}}/>
+                                <span style={{fontSize:10,fontWeight:600,color:sc.dot}}>{sc.label}</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{textAlign:"center",padding:"20px",color:T.inkMuted,fontSize:12}}>Không có đơn nghỉ phép nào trong ngày này</div>
+                  )}
+                </div>
+              </Modal>
+            )}
+          </>
+        );
+      })()}
 
       {tab === "policy" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
