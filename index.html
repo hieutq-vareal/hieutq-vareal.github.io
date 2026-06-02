@@ -3610,6 +3610,51 @@ const WorkflowPage = () => {
   const [otStart, setOtStart] = useState("17:00");
   const [otEnd,   setOtEnd]   = useState("21:30");
 
+  // ── Late/Early form states ─────────────────────────────────────
+  const [lateType,    setLateType]    = useState("late");     // "late" | "early"
+  const [lateDate,    setLateDate]    = useState("");
+  const [lateTime,    setLateTime]    = useState("");         // actual arrival/departure
+  const [makeupRanges,setMakeupRanges]= useState([{ id: 1, from: "", to: "" }]);
+
+  const addMakeup    = () => setMakeupRanges(p => [...p, { id: Date.now(), from: "", to: "" }]);
+  const removeMakeup = id => setMakeupRanges(p => p.filter(r => r.id !== id));
+  const updateMakeup = (id, f, v) => setMakeupRanges(p => p.map(r => r.id === id ? { ...r, [f]: v } : r));
+
+  const makeupHrs = (r) => {
+    if (!r.from || !r.to) return 0;
+    const f = new Date(r.from), t = new Date(r.to);
+    return (!isNaN(f) && !isNaN(t) && t > f) ? (t - f) / 3600000 : 0;
+  };
+  const totalMakeupHrs = makeupRanges.reduce((s, r) => s + makeupHrs(r), 0);
+  const fmtH = (h) => { if (!h) return "0 giờ"; const wh=Math.floor(h),wm=Math.round((h-wh)*60); return wm>0?`${wh}h ${wm}m`:`${wh}h`; };
+
+  // Missing hours: standard start 08:00, standard end 17:00
+  const calcMissingHrs = () => {
+    if (!lateDate || !lateTime) return 0;
+    const [h, m] = lateTime.split(":").map(Number);
+    const actualMin = h * 60 + m;
+    if (lateType === "late") {
+      const stdStart = 8 * 60; // 08:00
+      return Math.max(0, (actualMin - stdStart) / 60);
+    } else {
+      const stdEnd = 17 * 60; // 17:00
+      return Math.max(0, (stdEnd - actualMin) / 60);
+    }
+  };
+  const missingHrs = calcMissingHrs();
+
+  // Makeup overlap check
+  const hasMakeupOverlap = (() => {
+    const valid = makeupRanges.filter(r => r.from && r.to && new Date(r.to) > new Date(r.from));
+    for (let i = 0; i < valid.length; i++)
+      for (let j = i+1; j < valid.length; j++) {
+        const aF=new Date(valid[i].from),aT=new Date(valid[i].to);
+        const bF=new Date(valid[j].from),bT=new Date(valid[j].to);
+        if (aF < bT && bF < aT) return true;
+      }
+    return false;
+  })();
+
   const reqTypes = [
     { id: "wfh", icon: "🏠", label: "WFH (Làm từ xa)", desc: "Làm việc tại nhà hoặc ngoài văn phòng", color: T.primary },
     { id: "ot", icon: "⏰", label: "Làm thêm giờ (OT)", desc: "Đăng ký làm thêm ngoài giờ", color: T.accent },
@@ -3995,21 +4040,169 @@ const WorkflowPage = () => {
       )}
 
       {modal && modal.type === "late" && (
-        <Modal title="🕐 Đi muộn / Về sớm" onClose={() => setModal(null)} width={480}>
+        <Modal title="🕐 Đi muộn / Về sớm" onClose={() => setModal(null)} width={560}>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <Select label="Loại *"><option>Đi muộn</option><option>Về sớm</option></Select>
-            <Input label="Ngày *" type="date" />
+
+            {/* Loại + Ngày + Giờ */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <Input label="Giờ dự kiến đến / về *" type="time" />
-              <Input label="Thời gian ảnh hưởng" value="1.5 giờ" readOnly style={{ background: T.surfaceAlt }} />
+              <div>
+                <label style={{ display:"block", fontSize:12, fontWeight:600, color:T.inkSoft, marginBottom:5 }}>Loại *</label>
+                <div style={{ display:"flex", gap:0, borderRadius:T.rSm, overflow:"hidden", border:`1.5px solid ${T.border}` }}>
+                  {[["late","🕐 Đi muộn"],["early","🏃 Về sớm"]].map(([v,l]) => (
+                    <button key={v} onClick={() => setLateType(v)} style={{ flex:1, padding:"9px 8px", border:"none", background:lateType===v?T.primarySoft:T.surface, color:lateType===v?T.primary:T.inkSoft, fontSize:12, fontWeight:lateType===v?700:500, cursor:"pointer", transition:"all 0.12s", fontFamily:T.fontB }}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={{ display:"block", fontSize:12, fontWeight:600, color:T.inkSoft, marginBottom:5 }}>Ngày *</label>
+                <input type="date" value={lateDate} onChange={e => setLateDate(e.target.value)}
+                  style={{ width:"100%", padding:"9px 12px", borderRadius:T.rSm, border:`1.5px solid ${lateDate?T.primary:T.border}`, fontSize:13, fontFamily:T.fontB, color:T.ink, background:lateDate?T.primarySoft:T.surface, boxSizing:"border-box", outline:"none" }} />
+              </div>
             </div>
-            <div><label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSoft, marginBottom: 5 }}>Lý do *</label><textarea rows={2} placeholder="VD: Đưa con đi khám bệnh..." style={{ width: "100%", padding: "9px 12px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontB, resize: "vertical", boxSizing: "border-box" }} /></div>
-            <div style={{ padding: "10px 14px", background: T.infoSoft, borderRadius: T.r, fontSize: 12, color: T.info }}>
-              ℹ Đi muộn/về sớm dưới 15 phút sẽ tự động ghi nhận. Trên 15 phút cần Manager duyệt.
+
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+              <div>
+                <label style={{ display:"block", fontSize:12, fontWeight:600, color:T.inkSoft, marginBottom:5 }}>
+                  {lateType==="late" ? "Giờ đến thực tế *" : "Giờ về thực tế *"}
+                </label>
+                <input type="time" value={lateTime} onChange={e => setLateTime(e.target.value)}
+                  style={{ width:"100%", padding:"9px 12px", borderRadius:T.rSm, border:`1.5px solid ${lateTime?T.primary:T.border}`, fontSize:14, fontFamily:T.fontM, fontWeight:700, color:T.ink, boxSizing:"border-box", outline:"none" }} />
+                <div style={{ fontSize:10, color:T.inkMuted, marginTop:3 }}>
+                  {lateType==="late" ? "Giờ chuẩn: 08:00" : "Giờ chuẩn: 17:00"}
+                </div>
+              </div>
+
+              {/* Missing hours chip */}
+              <div style={{ display:"flex", flexDirection:"column", justifyContent:"flex-end" }}>
+                <label style={{ display:"block", fontSize:12, fontWeight:600, color:T.inkSoft, marginBottom:5 }}>Thời gian thiếu (tự tính)</label>
+                <div style={{ padding:"9px 14px", borderRadius:T.rSm, background:missingHrs>0?T.dangerSoft:T.surfaceAlt, border:`1.5px solid ${missingHrs>0?T.danger+"40":T.border}`, fontSize:14, fontWeight:800, fontFamily:T.fontD, color:missingHrs>0?T.danger:T.inkMuted, textAlign:"center" }}>
+                  {missingHrs>0 ? fmtH(missingHrs) : "—"}
+                </div>
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 10, justifyContent: "space-between" }}>
+
+            {/* Lý do */}
+            <div>
+              <label style={{ display:"block", fontSize:12, fontWeight:600, color:T.inkSoft, marginBottom:5 }}>Lý do *</label>
+              <textarea rows={2} placeholder="VD: Đưa con đi khám bệnh..." style={{ width:"100%", padding:"9px 12px", borderRadius:T.rSm, border:`1px solid ${T.border}`, fontSize:13, fontFamily:T.fontB, resize:"vertical", boxSizing:"border-box" }} />
+            </div>
+
+            {/* ── Make-up Working Time ── */}
+            <div style={{ borderTop:`1.5px dashed ${T.border}`, paddingTop:14 }}>
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                  <div style={{ width:30, height:30, borderRadius:T.rSm, background:T.successSoft, display:"flex", alignItems:"center", justifyContent:"center", fontSize:16 }}>🔄</div>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:700, color:T.ink }}>Thời gian làm bù</div>
+                    <div style={{ fontSize:11, color:T.inkMuted }}>Đăng ký làm bù cho số giờ thiếu</div>
+                  </div>
+                </div>
+                <button onClick={addMakeup} style={{ display:"flex", alignItems:"center", gap:4, padding:"5px 12px", borderRadius:T.rFull, border:`1.5px solid ${T.success}`, background:T.successSoft, color:T.success, fontSize:11, fontWeight:700, cursor:"pointer" }}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  Add Make-up Time
+                </button>
+              </div>
+
+              {/* Table header */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 64px 32px", gap:8, padding:"6px 10px", background:T.surfaceAlt, borderRadius:`${T.rSm} ${T.rSm} 0 0`, border:`1px solid ${T.border}`, borderBottom:"none" }}>
+                {["Make-up From","Make-up To","Thời lượng",""].map((h,i) => (
+                  <div key={i} style={{ fontSize:10, fontWeight:700, color:T.inkMuted, textTransform:"uppercase", letterSpacing:"0.05em" }}>{h}</div>
+                ))}
+              </div>
+              <div style={{ border:`1px solid ${T.border}`, borderRadius:`0 0 ${T.rSm} ${T.rSm}`, overflow:"hidden" }}>
+                {makeupRanges.map((r, ri) => {
+                  const h     = makeupHrs(r);
+                  const toErr = r.from && r.to && new Date(r.to) <= new Date(r.from);
+                  const rowOvl = hasMakeupOverlap && r.from && r.to && !toErr &&
+                    makeupRanges.some((other, j) => {
+                      if (j === ri || !other.from || !other.to) return false;
+                      const aF=new Date(r.from),aT=new Date(r.to),bF=new Date(other.from),bT=new Date(other.to);
+                      return aF < bT && bF < aT;
+                    });
+                  return (
+                    <div key={r.id} style={{ display:"grid", gridTemplateColumns:"1fr 1fr 64px 32px", gap:8, padding:"8px 10px", borderBottom:ri<makeupRanges.length-1?`1px solid ${T.borderLight}`:"none", background:rowOvl?"#FFF7ED":ri%2===0?"white":T.surfaceAlt, alignItems:"center" }}>
+                      <input type="datetime-local" value={r.from} onChange={e => updateMakeup(r.id,"from",e.target.value)}
+                        style={{ width:"100%", padding:"6px 9px", borderRadius:T.rSm, border:`1.5px solid ${r.from?T.success:T.border}`, fontSize:11, fontFamily:T.fontB, color:T.ink, background:"white", boxSizing:"border-box", outline:"none" }} />
+                      <div>
+                        <input type="datetime-local" value={r.to} min={r.from||undefined} onChange={e => updateMakeup(r.id,"to",e.target.value)}
+                          style={{ width:"100%", padding:"6px 9px", borderRadius:T.rSm, border:`1.5px solid ${toErr?T.danger:r.to?T.success:T.border}`, fontSize:11, fontFamily:T.fontB, color:T.ink, background:"white", boxSizing:"border-box", outline:"none" }} />
+                        {toErr && <div style={{ fontSize:9, color:T.danger, marginTop:2 }}>⚠ Phải sau giờ bắt đầu</div>}
+                      </div>
+                      <div style={{ textAlign:"center" }}>
+                        {h > 0 ? (
+                          <span style={{ display:"inline-block", padding:"2px 7px", borderRadius:T.rFull, background:rowOvl?"#FED7AA":T.successSoft, border:`1px solid ${rowOvl?"#F97316":T.success+"40"}`, fontSize:10, fontWeight:700, color:rowOvl?"#C2410C":T.success }}>
+                            {fmtH(h)}
+                          </span>
+                        ) : <span style={{ fontSize:10, color:T.inkMuted }}>—</span>}
+                      </div>
+                      <button onClick={() => removeMakeup(r.id)} disabled={makeupRanges.length===1}
+                        style={{ width:26, height:26, borderRadius:T.rSm, border:"none", background:makeupRanges.length===1?T.surfaceAlt:T.dangerSoft, color:makeupRanges.length===1?T.border:T.danger, cursor:makeupRanges.length===1?"not-allowed":"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Overlap warning */}
+              {hasMakeupOverlap && (
+                <div style={{ marginTop:8, display:"flex", alignItems:"center", gap:7, padding:"8px 12px", background:"#FFF7ED", border:"1px solid #FED7AA", borderRadius:T.rSm, fontSize:12, color:"#92400E" }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  Các khung giờ làm bù bị <b>trùng lặp</b>. Vui lòng kiểm tra lại.
+                </div>
+              )}
+
+              {/* Missing vs Makeup comparison */}
+              <div style={{ marginTop:10, display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+                <div style={{ padding:"12px 14px", borderRadius:T.r, background:T.dangerSoft, border:`1px solid ${T.danger}20`, textAlign:"center" }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:T.danger, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:4 }}>Missing Hours</div>
+                  <div style={{ fontSize:20, fontWeight:800, fontFamily:T.fontD, color:T.danger }}>{missingHrs>0?fmtH(missingHrs):"—"}</div>
+                  <div style={{ fontSize:10, color:T.danger, opacity:0.7, marginTop:2 }}>{lateType==="late"?"Thời gian đi muộn":"Thời gian về sớm"}</div>
+                </div>
+                <div style={{ padding:"12px 14px", borderRadius:T.r, background:totalMakeupHrs>0?T.successSoft:T.surfaceAlt, border:`1px solid ${totalMakeupHrs>0?T.success+"30":T.border}`, textAlign:"center" }}>
+                  <div style={{ fontSize:10, fontWeight:700, color:totalMakeupHrs>0?T.success:T.inkMuted, textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:4 }}>Make-up Hours</div>
+                  <div style={{ fontSize:20, fontWeight:800, fontFamily:T.fontD, color:totalMakeupHrs>0?T.success:T.inkMuted }}>{totalMakeupHrs>0?fmtH(totalMakeupHrs):"—"}</div>
+                  <div style={{ fontSize:10, color:totalMakeupHrs>0?T.success:T.inkMuted, opacity:0.7, marginTop:2 }}>Tổng giờ làm bù</div>
+                </div>
+              </div>
+
+              {/* Under-makeup warning */}
+              {missingHrs > 0 && totalMakeupHrs > 0 && totalMakeupHrs < missingHrs && (
+                <div style={{ marginTop:8, padding:"8px 12px", background:T.warningSoft, border:`1px solid ${T.warning}30`, borderRadius:T.rSm, fontSize:12, color:T.warning, display:"flex", alignItems:"center", gap:7 }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  Tổng thời gian làm bù (<b>{fmtH(totalMakeupHrs)}</b>) hiện nhỏ hơn thời gian {lateType==="late"?"đi muộn":"về sớm"} đã đăng ký (<b>{fmtH(missingHrs)}</b>).
+                </div>
+              )}
+              {missingHrs > 0 && totalMakeupHrs >= missingHrs && (
+                <div style={{ marginTop:8, padding:"8px 12px", background:T.successSoft, border:`1px solid ${T.success}30`, borderRadius:T.rSm, fontSize:12, color:T.success, display:"flex", alignItems:"center", gap:7 }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Thời gian làm bù đã đủ bù cho số giờ {lateType==="late"?"đi muộn":"về sớm"}.
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding:"10px 14px", background:T.infoSoft, borderRadius:T.r, fontSize:12, color:T.info }}>
+              ℹ Dưới 15 phút sẽ tự động ghi nhận. Trên 15 phút cần Manager duyệt.
+            </div>
+
+            {/* Approval flow */}
+            <div style={{ padding:"10px 14px", background:T.surfaceAlt, borderRadius:T.r, fontSize:12 }}>
+              <div style={{ fontWeight:600, color:T.ink, marginBottom:4 }}>Luồng phê duyệt</div>
+              <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                <Badge color={T.info} bg={T.infoSoft}>Bạn</Badge><span style={{ color:T.inkMuted }}>→</span>
+                <Badge color={T.primary} bg={T.primarySoft}>Manager</Badge><span style={{ color:T.inkMuted }}>→</span>
+                <Badge color={T.success} bg={T.successSoft}>✓</Badge>
+              </div>
+            </div>
+
+            <div style={{ display:"flex", gap:10, justifyContent:"space-between" }}>
               <Btn v="ghost" onClick={() => setModal("select")}>← Chọn lại</Btn>
-              <div style={{ display: "flex", gap: 10 }}><Btn v="secondary" onClick={() => setModal(null)}>Hủy</Btn><Btn>Gửi yêu cầu</Btn></div>
+              <div style={{ display:"flex", gap:10 }}>
+                <Btn v="secondary" onClick={() => setModal(null)}>Hủy</Btn>
+                <Btn disabled={hasMakeupOverlap}>Gửi yêu cầu</Btn>
+              </div>
             </div>
           </div>
         </Modal>
