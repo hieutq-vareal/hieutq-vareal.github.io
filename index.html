@@ -3676,7 +3676,9 @@ const WorkflowPage = () => {
       ]
     },
     { id: "WF-041", type: "WFH",               by: "Lê Thị Mai",       date: "17/04", st: "pending",   desc: "Bảo trì chung cư",                    icon: "🏠", dept: "Design",       created: "13/04 09:30", approver: "Đinh Trọng Hưng",  history: [{ step: "Tạo yêu cầu", by: "Lê Thị Mai",       time: "13/04 09:30", cancel: false }, { step: "Chờ duyệt", by: "Đinh Trọng Hưng", time: "Đang chờ", cancel: false }] },
-    { id: "WF-040", type: "OT",                by: "Nguyễn Văn An",    date: "13/04", st: "pending",   desc: "Deploy release v2.3 — 4 giờ",         icon: "⏰", dept: "Engineering",  created: "13/04 08:00", approver: "Đinh Trọng Hưng",  history: [{ step: "Tạo yêu cầu", by: "Nguyễn Văn An",    time: "13/04 08:00", cancel: false }, { step: "Chờ duyệt", by: "Đinh Trọng Hưng", time: "Đang chờ", cancel: false }] },
+    { id: "WF-040", type: "OT", by: "Nguyễn Văn An", date: "13/04", st: "pending", desc: "Deploy release v2.3 — 4 giờ", icon: "⏰", dept: "Engineering", created: "13/04 08:00", approver: "Đinh Trọng Hưng",
+      otDate: "2026-04-13", otStart: "17:00", otEnd: "23:00",
+      history: [{ step: "Tạo yêu cầu", by: "Nguyễn Văn An", time: "13/04 08:00", cancel: false }, { step: "Chờ duyệt", by: "Đinh Trọng Hưng", time: "Đang chờ", cancel: false }] },
     { id: "WF-039", type: "Công tác",          by: "Tạ Quang Hiếu",    date: "20-22/04", st: "pending", desc: "Khảo sát client tại Đà Nẵng",         icon: "✈️", dept: "Engineering", created: "12/04 15:00", approver: "Trần Thị Ngọc",    pri: true, history: [{ step: "Tạo yêu cầu", by: "Tạ Quang Hiếu",    time: "12/04 15:00", cancel: false }] },
     { id: "WF-038", type: "Xác nhận giấy tờ", by: "Vũ Đức Cường",     date: "11/04", st: "approved", desc: "Xác nhận thu nhập cho visa Nhật",      icon: "📄", dept: "Engineering",  created: "11/04 10:00", approver: "Lê Ngọc Minh Thư", history: [{ step: "Tạo yêu cầu", by: "Vũ Đức Cường",     time: "11/04 10:00", cancel: false }, { step: "HR duyệt", by: "Lê Ngọc Minh Thư",  time: "11/04 14:00", cancel: false }] },
     { id: "WF-037", type: "Thiết bị",          by: "Nguyễn Thị Hoa",   date: "08/04", st: "completed",desc: "Yêu cầu monitor 27 inch",              icon: "💻", dept: "HR",           created: "08/04 09:00", approver: "Trần Thị Ngọc",    history: [{ step: "Tạo yêu cầu", by: "Nguyễn Thị Hoa",   time: "08/04 09:00", cancel: false }, { step: "Hoàn tất",  by: "Trần Thị Ngọc",     time: "10/04 11:00", cancel: false }] },
@@ -4349,6 +4351,111 @@ const WorkflowPage = () => {
                 <span style={{ fontSize: 13, color: T.ink, fontWeight: 500, textAlign: "right", maxWidth: 280 }}>{v}</span>
               </div>
             ))}
+
+            {/* ── OT Conversion Section ── */}
+            {detailReq.type === "OT" && detailReq.otDate && detailReq.otStart && detailReq.otEnd && (() => {
+              const conv = calcConvertedOt(detailReq.otStart, detailReq.otEnd, detailReq.otDate, DEFAULT_OT_CONFIG);
+              if (!conv) return null;
+
+              const fmtMin = (m) => {
+                if (!m) return "—";
+                const h = Math.floor(m/60), min = m%60;
+                return min > 0 ? `${h}h ${min}m` : `${h}h`;
+              };
+              const toHHMM = (t) => t || "—";
+              const DAY_LABELS = { workday:"Ngày thường", weekend:"Cuối tuần", holiday:"Ngày lễ" };
+
+              // Build breakdown segments
+              const segments = [];
+              const [dsh, dsm] = DEFAULT_OT_CONFIG.dayShiftStart.split(":").map(Number);
+              const [deh, dem] = DEFAULT_OT_CONFIG.dayShiftEnd.split(":").map(Number);
+              const dayStart = dsh*60+dsm, dayEnd = deh*60+dem;
+              const [sh, sm] = detailReq.otStart.split(":").map(Number);
+              const [eh, em] = detailReq.otEnd.split(":").map(Number);
+              const startMin = sh*60+sm, endMin = eh*60+em;
+
+              if (conv.dayMins > 0) {
+                const segStart = Math.max(startMin, dayStart);
+                const segEnd   = Math.min(endMin, dayEnd);
+                segments.push({
+                  from: `${String(Math.floor(segStart/60)).padStart(2,"0")}:${String(segStart%60).padStart(2,"0")}`,
+                  to:   `${String(Math.floor(segEnd/60)).padStart(2,"0")}:${String(segEnd%60).padStart(2,"0")}`,
+                  shift: "Day Shift ☀️", rate: conv.dayRate, mins: conv.dayMins,
+                  converted: Math.round(conv.dayMins * conv.dayRate / 100),
+                });
+              }
+              if (conv.nightMins > 0) {
+                segments.push({
+                  from: DEFAULT_OT_CONFIG.dayShiftEnd,
+                  to:   detailReq.otEnd,
+                  shift: "Night Shift 🌙", rate: conv.nightRate, mins: conv.nightMins,
+                  converted: Math.round(conv.nightMins * conv.nightRate / 100),
+                });
+              }
+
+              return (
+                <div style={{ borderRadius: T.r, border: `1.5px solid ${T.accent}30`, overflow: "hidden", marginTop: 4 }}>
+                  {/* Section header */}
+                  <div style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 14px", background:T.accentSoft, borderBottom:`1px solid ${T.accent}20` }}>
+                    <span style={{ fontSize:16 }}>⏱</span>
+                    <span style={{ fontSize:11, fontWeight:700, color:T.accent, textTransform:"uppercase", letterSpacing:"0.06em" }}>OT Conversion Information</span>
+                    <span style={{ marginLeft:"auto", fontSize:10, padding:"2px 8px", borderRadius:T.rFull, background:T.accent, color:"white", fontWeight:700 }}>
+                      {DAY_LABELS[conv.dayType]}
+                    </span>
+                  </div>
+
+                  {/* 3-col summary cards */}
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", borderBottom:`1px solid ${T.border}` }}>
+                    {[
+                      { icon:"⏰", label:"Actual OT",     value:fmtMin(conv.actualMins),     sub:`${toHHMM(detailReq.otStart)} → ${toHHMM(detailReq.otEnd)}`, color:T.ink,    bg:"white"       },
+                      { icon:"📊", label:"OT Rate",        value:`${conv.dayMins>0?conv.dayRate:conv.nightRate}%`, sub:conv.dayMins>0?"☀️ Day Shift":"🌙 Night Shift",           color:T.accent,  bg:T.accentSoft  },
+                      { icon:"✨", label:"Converted OT",  value:fmtMin(conv.convertedMins),  sub:"Giờ OT sau quy đổi",                                         color:T.primary, bg:T.primarySoft },
+                    ].map((c,i) => (
+                      <div key={i} style={{ padding:"14px 12px", background:c.bg, borderLeft:i>0?`1px solid ${T.border}`:"none", textAlign:"center" }}>
+                        <div style={{ fontSize:18, marginBottom:3 }}>{c.icon}</div>
+                        <div style={{ fontSize:10, fontWeight:700, color:T.inkMuted, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:5 }}>{c.label}</div>
+                        <div style={{ fontSize:18, fontWeight:800, fontFamily:T.fontD, color:c.color, lineHeight:1.1 }}>{c.value}</div>
+                        <div style={{ fontSize:9, color:T.inkMuted, marginTop:3 }}>{c.sub}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Breakdown table — only if mixed shifts */}
+                  {segments.length > 1 && (
+                    <>
+                      <div style={{ padding:"8px 14px", background:T.surfaceAlt, borderBottom:`1px solid ${T.border}` }}>
+                        <span style={{ fontSize:10, fontWeight:700, color:T.inkMuted, textTransform:"uppercase", letterSpacing:"0.05em" }}>Chi tiết theo khung giờ</span>
+                      </div>
+                      {/* Table header */}
+                      <div style={{ display:"grid", gridTemplateColumns:"100px 100px 1fr 60px 80px 90px", gap:8, padding:"7px 14px", background:T.surfaceAlt, borderBottom:`1px solid ${T.border}` }}>
+                        {["Từ","Đến","Ca làm việc","Tỷ lệ","Thực tế","Quy đổi"].map((h,i) => (
+                          <div key={i} style={{ fontSize:9, fontWeight:700, color:T.inkMuted, textTransform:"uppercase", letterSpacing:"0.04em" }}>{h}</div>
+                        ))}
+                      </div>
+                      {segments.map((seg, si) => (
+                        <div key={si} style={{ display:"grid", gridTemplateColumns:"100px 100px 1fr 60px 80px 90px", gap:8, padding:"9px 14px", borderBottom:si<segments.length-1?`1px solid ${T.borderLight}`:"none", alignItems:"center", background:si%2===0?"white":T.surfaceAlt }}>
+                          <span style={{ fontSize:12, fontFamily:T.fontM, color:T.ink }}>{seg.from}</span>
+                          <span style={{ fontSize:12, fontFamily:T.fontM, color:T.ink }}>{seg.to}</span>
+                          <span style={{ fontSize:11, color:T.inkSoft }}>{seg.shift}</span>
+                          <span style={{ fontSize:12, fontWeight:700, color:T.accent, fontFamily:T.fontM }}>{seg.rate}%</span>
+                          <span style={{ fontSize:12, fontWeight:600, color:T.ink }}>{fmtMin(seg.mins)}</span>
+                          <span style={{ fontSize:12, fontWeight:800, color:T.primary, fontFamily:T.fontD }}>{fmtMin(seg.converted)}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {/* Summary footer */}
+                  <div style={{ display:"flex", justifyContent:"space-between", padding:"10px 14px", background:`${T.primary}06`, borderTop:`1px solid ${T.primary}20` }}>
+                    <div style={{ display:"flex", gap:16 }}>
+                      <span style={{ fontSize:11, color:T.inkSoft }}>Total Actual: <b style={{color:T.ink}}>{fmtMin(conv.actualMins)}</b></span>
+                      <span style={{ fontSize:11, color:T.inkSoft }}>Total Converted: <b style={{color:T.primary}}>{fmtMin(conv.convertedMins)}</b></span>
+                    </div>
+                    <span style={{ fontSize:11, color:T.inkMuted }}>Áp dụng: {DAY_LABELS[conv.dayType]}</span>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* ── Cancellation Reason Card ── */}
             {detailReq.st === "pending_cancel" && detailReq.cancelReason && (
