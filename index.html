@@ -1078,66 +1078,123 @@ const LeavePage = ({ onNav }) => {
         const HOLIDAYS_CAL = [
           { date: "2026-04-30", name: "30/4 — Giải phóng miền Nam",  color: "#6366F1", bg: "#EDE9FE" },
           { date: "2026-05-01", name: "01/5 — Quốc tế Lao động",     color: "#6366F1", bg: "#EDE9FE" },
-          { date: "2026-06-01", name: "01/6 — Ngày Quốc tế Thiếu nhi",color: "#EC4899", bg: "#FDF4FF" },
+          { date: "2026-06-01", name: "01/6 — Ngày Quốc tế Thiếu nhi", color: "#EC4899", bg: "#FDF4FF" },
         ];
 
         const ST_COLORS = {
-          approved:       { dot: T.success,  bg: T.successSoft,  label: "Đã duyệt"      },
-          pending:        { dot: T.warning,  bg: T.warningSoft,  label: "Chờ duyệt"     },
-          rejected:       { dot: T.danger,   bg: T.dangerSoft,   label: "Từ chối"        },
-          pending_cancel: { dot: "#D97706",  bg: "#FEF3C7",      label: "Chờ duyệt hủy" },
-          cancelled:      { dot: T.inkMuted, bg: T.surfaceAlt,   label: "Đã hủy"         },
+          approved:       { dot: T.success,  bg: T.successSoft,  bar: "#BBEAD6", label: "Đã duyệt"      },
+          pending:        { dot: T.warning,  bg: T.warningSoft,  bar: "#FDE68A", label: "Chờ duyệt"     },
+          rejected:       { dot: T.danger,   bg: T.dangerSoft,   bar: "#FECACA", label: "Từ chối"        },
+          pending_cancel: { dot: "#D97706",  bg: "#FEF3C7",      bar: "#FCD34D", label: "Chờ duyệt hủy" },
+          cancelled:      { dot: T.inkMuted, bg: T.surfaceAlt,   bar: "#D1D5DB", label: "Đã hủy"         },
         };
 
-        // Build map: "YYYY-MM-DD" → [{request, rangeFrom, rangeTo}]
-        const leaveMap = {};
-        const addDay = (dateStr, entry) => {
-          if (!leaveMap[dateStr]) leaveMap[dateStr] = [];
-          leaveMap[dateStr].push(entry);
-        };
+        const todayStr  = new Date().toISOString().slice(0,10);
+        const firstDay  = new Date(calYear, calMonth, 1).getDay();
+        const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+        const navMonth  = d => { const nd = new Date(calYear, calMonth+d); setCalMonth(nd.getMonth()); setCalYear(nd.getFullYear()); };
+        const dateStr   = d => `${calYear}-${String(calMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+        const addDays   = (ds, n) => { const d=new Date(ds); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
 
+        // ── Build event segments from requests ──────────────────
+        // Each segment = { reqId, req, segFrom(YYYY-MM-DD), segTo(YYYY-MM-DD), rng, isMultiDay, isContinuous }
+        const allSegments = [];
         requests.forEach(r => {
           const ranges = r.ranges || [{ from: r.fromDt||"", to: r.toDt||"" }];
-          ranges.forEach(rng => {
+          // Determine which ranges are consecutive days (for multi-day span rendering)
+          // Group consecutive date ranges of same request
+          ranges.forEach((rng, ri) => {
             if (!rng.from) return;
-            const f = new Date(rng.from);
-            const t = rng.to ? new Date(rng.to) : f;
-            const cur = new Date(f);
-            cur.setHours(0,0,0,0);
-            const end = new Date(t); end.setHours(0,0,0,0);
-            while (cur <= end) {
-              const key = cur.toISOString().slice(0,10);
-              addDay(key, { req: r, from: rng.from, to: rng.to });
-              cur.setDate(cur.getDate()+1);
-            }
+            const f = new Date(rng.from), t = rng.to ? new Date(rng.to) : new Date(rng.from);
+            const fromDate = f.toISOString().slice(0,10);
+            const toDate   = t.toISOString().slice(0,10);
+            const spanDays = Math.max(1, Math.round((new Date(toDate) - new Date(fromDate)) / 86400000) + 1);
+            allSegments.push({ req: r, segFrom: fromDate, segTo: toDate, spanDays, rng, ri });
           });
         });
 
-        // Filter
-        const filterLeave = (entries) => entries.filter(e => {
-          if (calSt   !== "all" && e.req.status !== calSt)   return false;
-          if (calType !== "all" && e.req.type   !== calType)  return false;
-          if (calDept !== "all" && e.req.dept   !== calDept)  return false;
-          if (calName && !e.req.name.toLowerCase().includes(calName.toLowerCase())) return false;
+        // Filter segments visible in current month
+        const monthStart = dateStr(1);
+        const monthEnd   = dateStr(daysInMonth);
+        const visibleSegs = allSegments.filter(s => {
+          // Keep if overlaps current month
+          if (s.segTo < monthStart || s.segFrom > monthEnd) return false;
+          // Apply filters
+          if (calSt   !== "all" && s.req.status !== calSt)   return false;
+          if (calType !== "all" && s.req.type   !== calType)  return false;
+          if (calDept !== "all" && s.req.dept   !== calDept)  return false;
+          if (calName && !s.req.name.toLowerCase().includes(calName.toLowerCase())) return false;
           return true;
         });
 
-        // Calendar grid
-        const firstDay = new Date(calYear, calMonth, 1).getDay();
-        const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
-        const todayStr = new Date().toISOString().slice(0,10);
-        const navMonth = d => {
-          const nd = new Date(calYear, calMonth+d);
-          setCalMonth(nd.getMonth()); setCalYear(nd.getFullYear());
-        };
+        // Build per-day map for discrete (same-day) entries
+        const dayMap = {};
+        visibleSegs.forEach(s => {
+          if (s.spanDays === 1) {
+            if (!dayMap[s.segFrom]) dayMap[s.segFrom] = [];
+            dayMap[s.segFrom].push(s);
+          }
+        });
 
-        const MAX_SHOW = 3;
+        // Build week-based span rows (for multi-day events)
+        // For each week row, compute which spans overlap it
+        const totalCells  = firstDay + daysInMonth;
+        const numWeeks    = Math.ceil(totalCells / 7);
+
+        // For each span, build week-rows it occupies: { weekIdx, colStart, colEnd, isStart, isEnd }
+        const spanRows = [];
+        visibleSegs.filter(s => s.spanDays > 1).forEach(s => {
+          const clampFrom = s.segFrom < monthStart ? monthStart : s.segFrom;
+          const clampTo   = s.segTo   > monthEnd   ? monthEnd   : s.segTo;
+          let curDate = clampFrom;
+          while (curDate <= clampTo) {
+            const d    = new Date(curDate);
+            const day  = parseInt(curDate.slice(8));
+            const cell = firstDay + day - 1;           // 0-based cell index
+            const week = Math.floor(cell / 7);
+            const col  = cell % 7;
+            // Find end of this week segment
+            const weekEndCell = week * 7 + 6;
+            const segEndDay   = parseInt(clampTo.slice(8));
+            const segEndCell  = firstDay + segEndDay - 1;
+            const colEnd      = Math.min(col + (segEndCell - cell), 6);
+            const endDate     = dateStr(Math.min(segEndDay, week * 7 + 7 - firstDay));
+            spanRows.push({
+              seg: s, week, colStart: col, colEnd,
+              isStart: curDate === clampFrom, isEnd: endDate >= clampTo,
+            });
+            // Advance to next week
+            const nextWeekStart = week * 7 + 7 - firstDay + 1;
+            if (nextWeekStart > daysInMonth) break;
+            curDate = dateStr(nextWeekStart);
+          }
+        });
+
+        // Group spanRows by week
+        const spansByWeek = {};
+        spanRows.forEach(sr => {
+          if (!spansByWeek[sr.week]) spansByWeek[sr.week] = [];
+          spansByWeek[sr.week].push(sr);
+        });
+
+        // Assign lane (vertical slot) per span within each week to avoid overlap
+        const laneSets = {}; // weekIdx → array of {from, to, lane}
+        spanRows.forEach(sr => {
+          const key = sr.week;
+          if (!laneSets[key]) laneSets[key] = [];
+          let lane = 0;
+          while (laneSets[key].some(l => l.lane === lane && l.colStart <= sr.colEnd && sr.colStart <= l.colEnd)) lane++;
+          sr.lane = lane;
+          laneSets[key].push({ colStart: sr.colStart, colEnd: sr.colEnd, lane });
+        });
+        const maxLanes = week => Math.max(0, ...(spansByWeek[week]||[]).map(s => s.lane + 1));
+
+        const CELL_W = 14.2857; // %
 
         return (
           <>
             {/* ── Toolbar ── */}
             <div style={{ display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",marginBottom:2 }}>
-              {/* Month nav */}
               <div style={{ display:"flex",alignItems:"center",gap:6 }}>
                 <button onClick={()=>navMonth(-1)} style={{ width:30,height:30,borderRadius:T.r,border:`1px solid ${T.border}`,background:T.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center" }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.inkSoft} strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
@@ -1148,13 +1205,11 @@ const LeavePage = ({ onNav }) => {
                 <button onClick={()=>navMonth(1)} style={{ width:30,height:30,borderRadius:T.r,border:`1px solid ${T.border}`,background:T.surface,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center" }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.inkSoft} strokeWidth="2.5" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
                 </button>
-                <button onClick={()=>{ setCalMonth(today2.getMonth()); setCalYear(today2.getFullYear()); }}
-                  style={{ padding:"5px 12px",borderRadius:T.rSm,border:`1px solid ${T.border}`,background:T.surface,fontSize:11,fontWeight:600,cursor:"pointer",color:T.inkSoft }}>
+                <button onClick={()=>{ setCalMonth(today2.getMonth()); setCalYear(today2.getFullYear()); }} style={{ padding:"5px 12px",borderRadius:T.rSm,border:`1px solid ${T.border}`,background:T.surface,fontSize:11,fontWeight:600,cursor:"pointer",color:T.inkSoft }}>
                   Hôm nay
                 </button>
               </div>
 
-              {/* Filters */}
               <div style={{ display:"flex",gap:8,flexWrap:"wrap",flex:1 }}>
                 <div style={{ position:"relative" }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={T.inkMuted} strokeWidth="2.2" strokeLinecap="round" style={{position:"absolute",left:8,top:"50%",transform:"translateY(-50%)",pointerEvents:"none"}}>
@@ -1175,16 +1230,10 @@ const LeavePage = ({ onNav }) => {
                 ))}
               </div>
 
-              {/* Legend */}
               <div style={{ display:"flex",gap:10,alignItems:"center",flexShrink:0 }}>
-                {[
-                  {c:T.success, l:"Đã duyệt"},
-                  {c:T.warning, l:"Chờ duyệt"},
-                  {c:T.danger,  l:"Từ chối"},
-                  {c:"#6366F1", l:"Ngày lễ"},
-                ].map(s => (
+                {[{c:T.success,l:"Đã duyệt"},{c:T.warning,l:"Chờ duyệt"},{c:T.danger,l:"Từ chối"},{c:"#6366F1",l:"Ngày lễ"}].map(s=>(
                   <div key={s.l} style={{display:"flex",alignItems:"center",gap:4}}>
-                    <div style={{width:8,height:8,borderRadius:"50%",background:s.c}}/>
+                    <div style={{width:8,height:8,borderRadius:2,background:s.c}}/>
                     <span style={{fontSize:10,color:T.inkMuted}}>{s.l}</span>
                   </div>
                 ))}
@@ -1192,94 +1241,117 @@ const LeavePage = ({ onNav }) => {
             </div>
 
             {/* ── Calendar Grid ── */}
-            <Card style={{ padding:0,overflow:"hidden" }}>
-              {/* Day headers */}
-              <div style={{ display:"grid",gridTemplateColumns:"repeat(7,1fr)",borderBottom:`1px solid ${T.border}` }}>
-                {["CN","T2","T3","T4","T5","T6","T7"].map((d,i) => (
+            <Card style={{ padding:0, overflow:"hidden" }}>
+              {/* Day name headers */}
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", borderBottom:`1px solid ${T.border}` }}>
+                {["CN","T2","T3","T4","T5","T6","T7"].map((d,i)=>(
                   <div key={d} style={{ padding:"8px 0",textAlign:"center",fontSize:11,fontWeight:700,color:i===0||i===6?T.inkMuted:T.inkSoft,background:T.surfaceAlt,borderLeft:i>0?`1px solid ${T.borderLight}`:"none",textTransform:"uppercase",letterSpacing:"0.04em" }}>{d}</div>
                 ))}
               </div>
 
-              {/* Calendar cells */}
-              <div style={{ display:"grid",gridTemplateColumns:"repeat(7,1fr)" }}>
-                {/* Empty leading cells */}
-                {Array.from({length:firstDay}).map((_,i) => (
-                  <div key={`e${i}`} style={{ minHeight:110,background:"#F8F9FA",borderRight:`1px solid ${T.borderLight}`,borderBottom:`1px solid ${T.borderLight}` }} />
-                ))}
+              {/* Week rows */}
+              {Array.from({length:numWeeks}).map((_,wi)=>{
+                const cellsInRow = 7;
+                const spanH = maxLanes(wi) * 20 + 4; // px per span lane
+                return (
+                  <div key={wi} style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", borderBottom:wi<numWeeks-1?`1px solid ${T.borderLight}`:"none", position:"relative" }}>
+                    {/* Day cells for this week */}
+                    {Array.from({length:7}).map((_,ci)=>{
+                      const cell = wi*7 + ci;
+                      const day  = cell - firstDay + 1;
+                      if (day < 1 || day > daysInMonth) return (
+                        <div key={ci} style={{ minHeight:Math.max(90, 90+spanH), background:"#F8F9FA", borderLeft:ci>0?`1px solid ${T.borderLight}`:"none", borderRight:"none" }} />
+                      );
+                      const ds      = dateStr(day);
+                      const isToday = ds === todayStr;
+                      const isWE    = ci===0||ci===6;
+                      const holiday = HOLIDAYS_CAL.find(h=>h.date===ds);
+                      const dayEntries = (dayMap[ds]||[]);
 
-                {/* Day cells */}
-                {Array.from({length:daysInMonth}).map((_,di) => {
-                  const dayNum  = di+1;
-                  const dateStr = `${calYear}-${String(calMonth+1).padStart(2,"0")}-${String(dayNum).padStart(2,"0")}`;
-                  const isToday = dateStr === todayStr;
-                  const isWE    = new Date(dateStr).getDay() === 0 || new Date(dateStr).getDay() === 6;
-                  const holiday = HOLIDAYS_CAL.find(h => h.date === dateStr);
-                  const rawEntries = leaveMap[dateStr] || [];
-                  const entries = filterLeave(rawEntries);
-                  const col    = (di + firstDay) % 7;
-                  const hasContent = holiday || entries.length > 0;
-
-                  return (
-                    <div key={dayNum}
-                      onClick={() => hasContent && setCalDayPop({ date: dateStr, entries, holiday })}
-                      style={{ minHeight:110,padding:"6px 8px",borderLeft:col>0?`1px solid ${T.borderLight}`:"none",borderBottom:`1px solid ${T.borderLight}`,background:isWE?"#F8F9FB":isToday?`${T.primary}06`:"white",cursor:hasContent?"pointer":"default",transition:"background 0.1s",position:"relative" }}
-                      onMouseEnter={e=>{ if(hasContent) e.currentTarget.style.background=isWE?"#F0F2F8":`${T.primary}0A`; }}
-                      onMouseLeave={e=>{ e.currentTarget.style.background=isWE?"#F8F9FB":isToday?`${T.primary}06`:"white"; }}
-                    >
-                      {/* Day number */}
-                      <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4 }}>
-                        <span style={{ width:24,height:24,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:isToday?700:500,color:isToday?"white":isWE?T.inkMuted:T.ink,background:isToday?T.primary:"transparent" }}>
-                          {dayNum}
-                        </span>
-                        {entries.length > 0 && (
-                          <span style={{ fontSize:9,fontWeight:700,color:T.inkMuted }}>{entries.length}👤</span>
-                        )}
-                      </div>
-
-                      {/* Holiday chip */}
-                      {holiday && (
-                        <div style={{ marginBottom:3,padding:"2px 6px",borderRadius:T.rSm,background:holiday.bg,border:`1px solid ${holiday.color}30`,fontSize:9,fontWeight:700,color:holiday.color,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
-                          🎉 {holiday.name.split("—")[0].trim()}
-                        </div>
-                      )}
-
-                      {/* Leave entries */}
-                      {entries.slice(0, MAX_SHOW).map((e, ei) => {
-                        const sc = ST_COLORS[e.req.status] || { dot:T.inkMuted, bg:T.surfaceAlt };
-                        const nameShort = e.req.name.split(" ").slice(-1)[0];
-                        return (
-                          <div key={ei} style={{ display:"flex",alignItems:"center",gap:4,padding:"2px 5px",borderRadius:T.rSm,background:sc.bg,marginBottom:2,overflow:"hidden" }}>
-                            <div style={{ width:6,height:6,borderRadius:"50%",background:sc.dot,flexShrink:0 }}/>
-                            <span style={{ fontSize:9,fontWeight:600,color:sc.dot,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1 }}>{nameShort}</span>
+                      return (
+                        <div key={ci}
+                          onClick={()=>{
+                            const allForDay = visibleSegs.filter(s => s.segFrom <= ds && s.segTo >= ds);
+                            if (allForDay.length > 0 || holiday) setCalDayPop({ date:ds, entries:allForDay, holiday });
+                          }}
+                          style={{ minHeight:Math.max(90,90+spanH), padding:"6px 8px", paddingBottom: 6+spanH, borderLeft:ci>0?`1px solid ${T.borderLight}`:"none", background:isWE?"#F8F9FB":isToday?`${T.primary}06`:"white", cursor:"pointer", position:"relative" }}>
+                          {/* Day number */}
+                          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4 }}>
+                            <span style={{ width:24,height:24,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:isToday?700:500,color:isToday?"white":isWE?T.inkMuted:T.ink,background:isToday?T.primary:"transparent" }}>
+                              {day}
+                            </span>
                           </div>
-                        );
-                      })}
-                      {entries.length > MAX_SHOW && (
-                        <div style={{ fontSize:9,color:T.inkMuted,fontWeight:600,padding:"1px 5px" }}>+{entries.length-MAX_SHOW} more</div>
-                      )}
-                    </div>
-                  );
-                })}
+                          {/* Holiday chip */}
+                          {holiday && (
+                            <div style={{ marginBottom:3,padding:"2px 6px",borderRadius:T.rSm,background:holiday.bg,border:`1px solid ${holiday.color}30`,fontSize:9,fontWeight:700,color:holiday.color,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
+                              🎉 {holiday.name.split("—")[0].trim()}
+                            </div>
+                          )}
+                          {/* Discrete same-day entries */}
+                          {dayEntries.slice(0,2).map((s,ei)=>{
+                            const sc = ST_COLORS[s.req.status]||{dot:T.inkMuted,bg:T.surfaceAlt};
+                            return (
+                              <div key={ei} style={{ display:"flex",alignItems:"center",gap:4,padding:"2px 5px",borderRadius:T.rSm,background:sc.bg,marginBottom:2,overflow:"hidden" }}>
+                                <div style={{ width:5,height:5,borderRadius:"50%",background:sc.dot,flexShrink:0 }}/>
+                                <span style={{ fontSize:9,fontWeight:600,color:sc.dot,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1 }}>
+                                  {s.req.name.split(" ").slice(-1)[0]}
+                                  {s.rng.from && <span style={{opacity:0.7}}> {new Date(s.rng.from).toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"})}</span>}
+                                </span>
+                              </div>
+                            );
+                          })}
+                          {dayEntries.length > 2 && <div style={{fontSize:9,color:T.inkMuted,fontWeight:600,padding:"1px 5px"}}>+{dayEntries.length-2}</div>}
+                        </div>
+                      );
+                    })}
 
-                {/* Trailing empty cells */}
-                {(() => {
-                  const total = firstDay + daysInMonth;
-                  const trail = (7 - (total % 7)) % 7;
-                  return Array.from({length:trail}).map((_,i) => (
-                    <div key={`t${i}`} style={{ minHeight:110,background:"#F8F9FA",borderLeft:`1px solid ${T.borderLight}`,borderBottom:`1px solid ${T.borderLight}` }} />
-                  ));
-                })()}
-              </div>
+                    {/* Multi-day span bars — absolutely positioned over the row */}
+                    {(spansByWeek[wi]||[]).map((sr,si)=>{
+                      const sc = ST_COLORS[sr.seg.req.status]||{dot:T.inkMuted,bar:"#D1D5DB"};
+                      const left  = `${sr.colStart * CELL_W}%`;
+                      const width = `${(sr.colEnd - sr.colStart + 1) * CELL_W - 0.5}%`;
+                      const top   = `${90 + sr.lane * 20}px`;
+                      const name  = sr.seg.req.name.split(" ").slice(-1)[0];
+                      return (
+                        <div key={si}
+                          onClick={e=>{
+                            e.stopPropagation();
+                            const allForDay = visibleSegs.filter(s => s.req.id === sr.seg.req.id);
+                            setCalDayPop({ date: sr.seg.segFrom, entries: allForDay, holiday: null, focusReq: sr.seg.req });
+                          }}
+                          title={`${sr.seg.req.name} · ${sr.seg.req.type} · ${sr.seg.segFrom} → ${sr.seg.segTo}`}
+                          style={{
+                            position:"absolute", left, top, width, height:18,
+                            background:sc.bar, borderRadius:`${sr.isStart?4:0}px ${sr.isEnd?4:0}px ${sr.isEnd?4:0}px ${sr.isStart?4:0}px`,
+                            borderLeft: sr.isStart ? `3px solid ${sc.dot}` : "none",
+                            display:"flex", alignItems:"center", overflow:"hidden",
+                            cursor:"pointer", zIndex:2,
+                            paddingLeft: sr.isStart ? 5 : 2, paddingRight:4,
+                          }}>
+                          {sr.isStart && (
+                            <>
+                              <div style={{ width:5,height:5,borderRadius:"50%",background:sc.dot,flexShrink:0,marginRight:4 }}/>
+                              <span style={{ fontSize:9,fontWeight:700,color:sc.dot,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
+                                {name} · {sr.seg.req.type}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
             </Card>
 
-            {/* ── Month summary strip ── */}
+            {/* ── Month summary ── */}
             <div style={{ display:"flex",gap:12,flexWrap:"wrap" }}>
               {[
-                { label:"Tổng đơn tháng này", value: (() => { const keys=Object.keys(leaveMap).filter(k=>k.startsWith(`${calYear}-${String(calMonth+1).padStart(2,"0")}`)); return new Set(keys.flatMap(k=>filterLeave(leaveMap[k]).map(e=>e.req.id))).size; })(), color:T.primary },
-                { label:"Đã duyệt",  value: new Set(Object.values(leaveMap).flatMap(e=>filterLeave(e).filter(x=>x.req.status==="approved").map(x=>x.req.id))).size, color:T.success },
-                { label:"Chờ duyệt", value: new Set(Object.values(leaveMap).flatMap(e=>filterLeave(e).filter(x=>x.req.status==="pending").map(x=>x.req.id))).size,  color:T.warning },
-                { label:"Ngày lễ",   value: HOLIDAYS_CAL.filter(h=>h.date.startsWith(`${calYear}-${String(calMonth+1).padStart(2,"0")}`)).length,                     color:"#6366F1" },
-              ].map((s,i) => (
+                { label:"Đơn tháng này", value: new Set(visibleSegs.map(s=>s.req.id)).size,                                      color:T.primary },
+                { label:"Đã duyệt",      value: new Set(visibleSegs.filter(s=>s.req.status==="approved").map(s=>s.req.id)).size,  color:T.success },
+                { label:"Chờ duyệt",     value: new Set(visibleSegs.filter(s=>s.req.status==="pending").map(s=>s.req.id)).size,   color:T.warning },
+                { label:"Ngày lễ",       value: HOLIDAYS_CAL.filter(h=>h.date.startsWith(`${calYear}-${String(calMonth+1).padStart(2,"0")}`)).length, color:"#6366F1" },
+              ].map((s,i)=>(
                 <div key={i} style={{ padding:"9px 16px",background:T.surface,borderRadius:T.r,border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:8 }}>
                   <div style={{ width:7,height:7,borderRadius:"50%",background:s.color }}/>
                   <span style={{ fontSize:12,color:T.inkSoft }}>{s.label}:</span>
@@ -1288,14 +1360,16 @@ const LeavePage = ({ onNav }) => {
               ))}
             </div>
 
-            {/* ── Day Popup ── */}
+            {/* ── Day / Request Popup ── */}
             {calDayPop && (
               <Modal
-                title={`${new Date(calDayPop.date).toLocaleDateString("vi-VN",{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}`}
+                title={calDayPop.focusReq
+                  ? `${calDayPop.focusReq.type} · ${calDayPop.focusReq.name}`
+                  : new Date(calDayPop.date).toLocaleDateString("vi-VN",{weekday:"long",day:"2-digit",month:"long",year:"numeric"})}
                 onClose={()=>setCalDayPop(null)}
-                width={520}
+                width={540}
               >
-                <div style={{ display:"flex",flexDirection:"column",gap:12 }}>
+                <div style={{ display:"flex",flexDirection:"column",gap:14 }}>
                   {/* Holiday */}
                   {calDayPop.holiday && (
                     <div style={{ display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:T.r,background:calDayPop.holiday.bg,border:`1.5px solid ${calDayPop.holiday.color}40` }}>
@@ -1307,48 +1381,64 @@ const LeavePage = ({ onNav }) => {
                     </div>
                   )}
 
-                  {/* Leave table */}
-                  {calDayPop.entries.length > 0 ? (
-                    <>
-                      <div style={{fontSize:12,fontWeight:700,color:T.inkSoft,textTransform:"uppercase",letterSpacing:"0.05em"}}>
-                        {calDayPop.entries.length} nhân viên nghỉ
-                      </div>
-                      {/* Header */}
-                      <div style={{border:`1px solid ${T.border}`,borderRadius:T.rSm,overflow:"hidden"}}>
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 100px 90px 90px",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,padding:"7px 12px",gap:8}}>
-                          {["Nhân viên","Loại phép","Thời lượng","Trạng thái"].map((h,i)=>(
-                            <div key={i} style={{fontSize:10,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.04em"}}>{h}</div>
-                          ))}
-                        </div>
-                        {calDayPop.entries.map((e,ei)=>{
-                          const sc = ST_COLORS[e.req.status] || {dot:T.inkMuted,bg:T.surfaceAlt,label:e.req.status};
-                          const hrs = rangeHrsLeave(e.from, e.to);
-                          return (
-                            <div key={ei} style={{display:"grid",gridTemplateColumns:"1fr 100px 90px 90px",padding:"9px 12px",gap:8,borderBottom:ei<calDayPop.entries.length-1?`1px solid ${T.borderLight}`:"none",alignItems:"center",background:ei%2===0?"white":T.surfaceAlt}}>
-                              <div style={{display:"flex",alignItems:"center",gap:7}}>
-                                {(() => {
-                                  const DC = { Engineering: T.primary, Design: "#7C3AED", QA: "#0891B2", HR: T.accent, "Kế toán": T.success, DevOps: "#059669" };
-                                  const c = DC[e.req.dept] || T.primary;
-                                  return <Avatar name={e.req.name} size={24} colors={[`${c}25`, c]} />;
-                                })()}
-                                <div>
-                                  <div style={{fontSize:12,fontWeight:600,color:T.ink}}>{e.req.name}</div>
-                                  <div style={{fontSize:10,color:T.inkMuted}}>{e.req.dept}</div>
-                                </div>
+                  {/* Group entries by request ID */}
+                  {calDayPop.entries.length > 0 ? (() => {
+                    // De-dup by request
+                    const reqMap = {};
+                    calDayPop.entries.forEach(s => {
+                      if (!reqMap[s.req.id]) reqMap[s.req.id] = { req: s.req, segs: [] };
+                      reqMap[s.req.id].segs.push(s);
+                    });
+                    return Object.values(reqMap).map(({ req, segs }) => {
+                      const sc = ST_COLORS[req.status]||{dot:T.inkMuted,bg:T.surfaceAlt,label:req.status};
+                      const allRanges = req.ranges || [{ from: req.fromDt, to: req.toDt }];
+                      return (
+                        <div key={req.id} style={{ border:`1px solid ${T.border}`,borderRadius:T.r,overflow:"hidden" }}>
+                          {/* Request header */}
+                          <div style={{ display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}` }}>
+                            <div style={{ width:8,height:8,borderRadius:"50%",background:sc.dot,flexShrink:0 }}/>
+                            <div style={{ flex:1 }}>
+                              <div style={{ display:"flex",alignItems:"center",gap:8 }}>
+                                <span style={{ fontSize:13,fontWeight:700,color:T.ink }}>{req.name}</span>
+                                <span style={{ fontSize:10,fontFamily:T.fontM,color:T.inkMuted }}>{req.id}</span>
                               </div>
-                              <span style={{fontSize:11,color:T.inkSoft}}>{e.req.type}</span>
-                              <span style={{fontSize:11,fontWeight:600,color:T.ink}}>{hrs>0?fmtHrsLeave(hrs):"Full day"}</span>
-                              <div style={{display:"flex",alignItems:"center",gap:4}}>
-                                <div style={{width:6,height:6,borderRadius:"50%",background:sc.dot,flexShrink:0}}/>
-                                <span style={{fontSize:10,fontWeight:600,color:sc.dot}}>{sc.label}</span>
-                              </div>
+                              <div style={{ fontSize:11,color:T.inkMuted }}>{req.dept} · {req.type}</div>
                             </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{textAlign:"center",padding:"20px",color:T.inkMuted,fontSize:12}}>Không có đơn nghỉ phép nào trong ngày này</div>
+                            <Badge color={sc.dot} bg={sc.bg} dot>{sc.label}</Badge>
+                          </div>
+
+                          {/* All time ranges of this request */}
+                          <div style={{ padding:"10px 14px" }}>
+                            <div style={{ fontSize:10,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8 }}>
+                              {allRanges.length > 1 ? `${allRanges.length} khoảng thời gian nghỉ` : "Thời gian nghỉ"}
+                            </div>
+                            {allRanges.map((rng,ri)=>{
+                              const f = rng.from ? new Date(rng.from) : null;
+                              const t = rng.to   ? new Date(rng.to)   : null;
+                              const h = f&&t ? Math.round((t-f)/3600000*10)/10 : 0;
+                              const isCurrentDay = f && f.toISOString().slice(0,10) === calDayPop.date;
+                              return (
+                                <div key={ri} style={{ display:"flex",alignItems:"center",gap:10,padding:"7px 10px",borderRadius:T.rSm,background:isCurrentDay?`${sc.dot}10`:T.surfaceAlt,border:`1px solid ${isCurrentDay?sc.dot+"30":T.borderLight}`,marginBottom:4 }}>
+                                  <span style={{ width:18,height:18,borderRadius:"50%",background:isCurrentDay?sc.dot:T.border,color:"white",fontSize:9,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>{ri+1}</span>
+                                  <div style={{ flex:1 }}>
+                                    <div style={{ fontSize:12,fontFamily:T.fontM,color:T.ink }}>
+                                      {f ? f.toLocaleDateString("vi-VN",{day:"2-digit",month:"2-digit",year:"numeric"}) : "—"}
+                                    </div>
+                                    <div style={{ fontSize:11,color:T.inkMuted,marginTop:1 }}>
+                                      {f ? f.toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"}) : ""} → {t ? t.toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"}) : ""}
+                                    </div>
+                                  </div>
+                                  <span style={{ fontSize:10,fontWeight:700,color:isCurrentDay?sc.dot:T.inkMuted,padding:"2px 7px",borderRadius:T.rFull,background:isCurrentDay?`${sc.dot}15`:T.surfaceAlt }}>{h>0?`${h}h`:"—"}</span>
+                                  {isCurrentDay && <span style={{ fontSize:9,color:sc.dot,fontWeight:700 }}>← Hôm nay</span>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })() : (
+                    <div style={{textAlign:"center",padding:"20px",color:T.inkMuted,fontSize:12}}>Không có đơn nghỉ phép nào</div>
                   )}
                 </div>
               </Modal>
@@ -8205,7 +8295,9 @@ const WorkSchedulePage = () => {
     { id:2, name:"Lê Thị Mai",      dept:"Design",      approver:APPROVERS[0], status:"approved", role:"member"   },
     { id:3, name:"Trần Đức Hùng",   dept:"Engineering", approver:APPROVERS[1], status:"pending",  role:"member"   },
     { id:4, name:"Phạm Minh Tuấn",  dept:"QA",          approver:APPROVERS[0], status:"none",     role:"member"   },
-    { id:5, name:"Hoàng Thị Lan",   dept:"Design",      approver:APPROVERS[0], status:"rejected", role:"member"   },
+    { id:5, name:"Hoàng Thị Lan",   dept:"Design",      approver:APPROVERS[0], status:"rejected", role:"member",
+      rejectedReason:"Ngày 15/06 công ty yêu cầu toàn bộ team tham gia workshop trực tiếp tại văn phòng.",
+      rejectedBy:APPROVERS[0], rejectedAt:"14/06 09:00" },
     { id:6, name:"Vũ Đức Minh",     dept:"Engineering", approver:APPROVERS[1], status:"pending",  role:"member"   },
     { id:7, name:"Đinh Trọng Hưng", dept:"Engineering", approver:APPROVERS[0], status:"approved", role:"approver" },
   ]);
@@ -8231,10 +8323,11 @@ const WorkSchedulePage = () => {
   }, [emps, role, deptF, stF, nameQ]);
 
   const ST_CFG = {
-    none:     { l:"Chưa gửi",    c:T.inkMuted, bg:T.surfaceAlt  },
-    pending:  { l:"Chờ duyệt",   c:T.warning,  bg:T.warningSoft },
-    approved: { l:"Đã duyệt",    c:T.success,  bg:T.successSoft },
-    rejected: { l:"Từ chối",     c:T.danger,   bg:T.dangerSoft  },
+    none:         { l:"Chưa gửi",           c:T.inkMuted,  bg:T.surfaceAlt  },
+    pending:      { l:"Chờ duyệt",          c:T.warning,   bg:T.warningSoft },
+    approved:     { l:"Đã duyệt",           c:T.success,   bg:T.successSoft },
+    rejected:     { l:"Từ chối",            c:T.danger,    bg:T.dangerSoft  },
+    pending_swap: { l:"Chờ duyệt đổi lịch", c:"#7C3AED",  bg:"#EDE9FE"     },
   };
 
   const toggle = (empId, dayIdx) => {
@@ -8254,9 +8347,33 @@ const WorkSchedulePage = () => {
     setEmps(prev => prev.map(e => e.id!==last.empId ? e : { ...e, schedule: { ...e.schedule, [last.dayIdx]: last.prev } }));
   };
 
-  const submit    = id => setEmps(prev => prev.map(e => e.id!==id ? e : { ...e, status:"pending" }));
-  const decide    = (id, v) => setEmps(prev => prev.map(e => e.id!==id ? e : { ...e, status:v }));
-  const bulkDecide= v => setEmps(prev => prev.map(e => e.status==="pending" ? { ...e, status:v } : e));
+  const submit     = id => setEmps(prev => prev.map(e => e.id!==id ? e : { ...e, status:"pending" }));
+  const decide     = (id, v) => setEmps(prev => prev.map(e => e.id!==id ? e : { ...e, status:v }));
+  const bulkDecide = v => setEmps(prev => prev.map(e => e.status==="pending" ? { ...e, status:v } : e));
+
+  // ── Reject modal ─────────────────────────────────────────────
+  const [rejectModal,  setRejectModal]  = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const confirmReject = () => {
+    if (rejectReason.trim().length < 10) return;
+    setEmps(prev => prev.map(e => e.id !== rejectModal.id ? e : { ...e, status:"rejected",
+      rejectedReason:rejectReason, rejectedBy:e.approver,
+      rejectedAt:new Date().toLocaleString("vi-VN",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) }));
+    setRejectModal(null); setRejectReason("");
+  };
+
+  // ── Swap modal ────────────────────────────────────────────────
+  const [swapModal, setSwapModal] = useState(null);
+  const [swapForm,  setSwapForm]  = useState({ pairs:[], reason:"" });
+  // pairs = [{ fromIdx: number, toDate: "YYYY-MM-DD" }]
+
+  const confirmSwap = () => {
+    const validPairs = swapForm.pairs.filter(p => p.fromIdx !== null && p.toDate);
+    if (validPairs.length === 0) return;
+    setEmps(prev => prev.map(e => e.id!==swapModal.id ? e : { ...e, status:"pending_swap",
+      pendingSwap:{ pairs: validPairs, reason:swapForm.reason, requestedAt:"Vừa xong" } }));
+    setSwapModal(null); setSwapForm({ pairs:[], reason:"" });
+  };
 
   const applyWeekR = (empId, ws) =>
     setEmps(prev => prev.map(e => {
@@ -8333,13 +8450,13 @@ const WorkSchedulePage = () => {
                 Hoàn tác ({history.length})
               </Btn>
             )}
-            {(role==="approver"||role==="admin") && emps.some(e=>e.status==="pending") && (
+            {(role==="approver"||role==="admin") && emps.some(e=>e.status==="pending"||e.status==="pending_swap") && (
               <>
                 <Btn v="success" size="sm" onClick={()=>bulkDecide("approved")} style={{ gap:4 }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
                   Duyệt tất cả
                 </Btn>
-                <Btn v="danger" size="sm" onClick={()=>bulkDecide("rejected")} style={{ gap:4 }}>
+                <Btn v="danger" size="sm" onClick={()=>{ setRejectModal({_bulk:true}); setRejectReason(""); }} style={{ gap:4 }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                   Từ chối tất cả
                 </Btn>
@@ -8522,8 +8639,10 @@ const WorkSchedulePage = () => {
                             title={`${d.toLocaleDateString("vi-VN")} · ${emp.name} · ${isWE?"Cuối tuần":val==="R"?"Remote":"Office"}`}
                             style={{textAlign:"center",padding:"3px 2px",borderLeft:`1px solid ${T.borderLight}`,background:"white",cursor:!isWE&&edit?"pointer":"default",transition:"background 0.08s"}}>
                             {!isWE && val ? (
-                              <div style={{width:30,height:24,margin:"auto",borderRadius:4,background:bg,border:`1px solid ${bc}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,fontFamily:T.fontM,color:fc,transition:"all 0.1s",outline:isTd?`2px solid ${T.primary}`:undefined,outlineOffset:-2,userSelect:"none"}}>
+                              <div style={{width:30,height:24,margin:"auto",borderRadius:4,background:bg,border:`1px solid ${bc}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,fontFamily:T.fontM,color:fc,transition:"all 0.1s",outline:isTd?`2px solid ${T.primary}`:undefined,outlineOffset:-2,userSelect:"none",position:"relative"}}
+                                title={emp.pendingSwap&&val==="R"?`🔄 Đề xuất đổi (${(emp.pendingSwap.pairs||[]).length} ngày)`:undefined}>
                                 {val}
+                                {emp.pendingSwap&&val==="R"&&<span style={{position:"absolute",top:-4,right:-4,fontSize:8}}>🔄</span>}
                               </div>
                             ) : (
                               <div style={{width:30,height:24,margin:"auto",borderRadius:4,background:isWE?"#ECEEF0":"transparent",display:"flex",alignItems:"center",justifyContent:"center"}}>
@@ -8545,20 +8664,44 @@ const WorkSchedulePage = () => {
                         <span style={{fontSize:12,fontWeight:700,color:pct>=50?T.primary:T.inkSoft}}>{pct}%</span>
                       </td>
 
-                      {/* Approve actions */}
+                      {/* ── Action column ── */}
                       {(role==="approver"||role==="admin") && (
-                        <td style={{textAlign:"center",padding:"8px 10px",borderLeft:`2px solid ${T.border}`,minWidth:110}}>
+                        <td style={{textAlign:"center",padding:"8px 10px",borderLeft:`2px solid ${T.border}`,minWidth:150}}>
                           {emp.status==="pending" ? (
                             <div style={{display:"flex",gap:5,justifyContent:"center"}}>
-                              <button onClick={()=>decide(emp.id,"approved")} style={{padding:"4px 10px",borderRadius:T.rSm,border:"none",background:T.successSoft,color:T.success,fontSize:11,fontWeight:700,cursor:"pointer"}}>
-                                ✓ Duyệt
-                              </button>
-                              <button onClick={()=>decide(emp.id,"rejected")} style={{padding:"4px 10px",borderRadius:T.rSm,border:"none",background:T.dangerSoft,color:T.danger,fontSize:11,fontWeight:700,cursor:"pointer"}}>
-                                ✕ Từ chối
-                              </button>
+                              <button onClick={()=>decide(emp.id,"approved")} style={{padding:"4px 10px",borderRadius:T.rSm,border:"none",background:T.successSoft,color:T.success,fontSize:11,fontWeight:700,cursor:"pointer"}}>✓ Duyệt</button>
+                              <button onClick={()=>{setRejectModal(emp);setRejectReason("");}} style={{padding:"4px 10px",borderRadius:T.rSm,border:"none",background:T.dangerSoft,color:T.danger,fontSize:11,fontWeight:700,cursor:"pointer"}}>✕ Từ chối</button>
                             </div>
-                          ) : (
-                            <span style={{fontSize:11,color:T.inkMuted}}>—</span>
+                          ) : emp.status==="pending_swap" ? (
+                            <div style={{display:"flex",gap:5,justifyContent:"center"}}>
+                              <button onClick={()=>setEmps(prev=>prev.map(e=>e.id===emp.id?{...e,status:"approved",pendingSwap:null}:e))} style={{padding:"4px 10px",borderRadius:T.rSm,border:"none",background:T.successSoft,color:T.success,fontSize:11,fontWeight:700,cursor:"pointer"}}>✓ Duyệt đổi</button>
+                              <button onClick={()=>{setRejectModal({...emp,_swapReject:true});setRejectReason("");}} style={{padding:"4px 10px",borderRadius:T.rSm,border:"none",background:T.dangerSoft,color:T.danger,fontSize:11,fontWeight:700,cursor:"pointer"}}>✕ Từ chối</button>
+                            </div>
+                          ) : emp.status==="rejected"&&emp.rejectedReason ? (
+                            <div style={{fontSize:10,color:T.danger,maxWidth:140,textAlign:"left",padding:"4px 8px",background:T.dangerSoft,borderRadius:T.rSm}}>
+                              <div style={{fontWeight:700,marginBottom:2}}>Đã từ chối</div>
+                              <div style={{opacity:0.85,overflow:"hidden",textOverflow:"ellipsis",display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical"}}>{emp.rejectedReason}</div>
+                            </div>
+                          ) : <span style={{fontSize:11,color:T.inkMuted}}>—</span>}
+                        </td>
+                      )}
+                      {role==="member"&&emp.name==="Nguyễn Văn An"&&(
+                        <td style={{padding:"8px 10px",borderLeft:`2px solid ${T.border}`,minWidth:170}}>
+                          {emp.status==="rejected"&&emp.rejectedReason&&(
+                            <div style={{padding:"8px 10px",background:T.dangerSoft,border:`1px solid ${T.danger}30`,borderRadius:T.rSm,fontSize:11}}>
+                              <div style={{fontWeight:700,color:T.danger,marginBottom:3}}>❌ Lý do từ chối</div>
+                              <div style={{color:"#7F1D1D",lineHeight:1.4,fontStyle:"italic"}}>"{emp.rejectedReason}"</div>
+                              <div style={{fontSize:10,color:T.inkMuted,marginTop:4}}>{emp.rejectedBy} · {emp.rejectedAt}</div>
+                            </div>
+                          )}
+                          {emp.status==="approved"&&(
+                            <button onClick={()=>{setSwapModal(emp);setSwapForm({pairs:[],reason:""}); }}
+                              style={{display:"flex",alignItems:"center",gap:5,padding:"6px 10px",borderRadius:T.rSm,border:"1px solid #7C3AED",background:"#EDE9FE",color:"#7C3AED",fontSize:11,fontWeight:700,cursor:"pointer",width:"100%",justifyContent:"center"}}>
+                              🔄 Đổi ngày Remote
+                            </button>
+                          )}
+                          {emp.status==="pending_swap"&&(
+                            <div style={{padding:"6px 10px",background:"#EDE9FE",border:"1px solid #7C3AED30",borderRadius:T.rSm,fontSize:10,color:"#7C3AED",fontWeight:600,textAlign:"center"}}>🔄 Đang chờ duyệt đổi lịch</div>
                           )}
                         </td>
                       )}
@@ -8582,10 +8725,11 @@ const WorkSchedulePage = () => {
         {/* Stats footer */}
         <div style={{display:"flex",gap:10,flexShrink:0,flexWrap:"wrap"}}>
           {[
-            {label:"Tổng",       v:emps.length,                                  c:T.primary },
-            {label:"Chờ duyệt", v:emps.filter(e=>e.status==="pending").length,   c:T.warning },
-            {label:"Đã duyệt",  v:emps.filter(e=>e.status==="approved").length,  c:T.success },
-            {label:"Từ chối",   v:emps.filter(e=>e.status==="rejected").length,  c:T.danger  },
+            {label:"Tổng",       v:emps.length,                                       c:T.primary },
+            {label:"Chờ duyệt", v:emps.filter(e=>e.status==="pending").length,        c:T.warning },
+            {label:"Đã duyệt",  v:emps.filter(e=>e.status==="approved").length,       c:T.success },
+            {label:"Từ chối",   v:emps.filter(e=>e.status==="rejected").length,       c:T.danger  },
+            {label:"Chờ đổi",   v:emps.filter(e=>e.status==="pending_swap").length,   c:"#7C3AED" },
           ].map((s,i)=>(
             <div key={i} style={{padding:"8px 16px",background:T.surface,borderRadius:T.r,border:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:8}}>
               <div style={{width:7,height:7,borderRadius:"50%",background:s.c}} />
@@ -8595,6 +8739,257 @@ const WorkSchedulePage = () => {
           ))}
         </div>
       </div>
+
+      {/* ── Reject Modal ── */}
+      {rejectModal && (
+        <Modal title={rejectModal._bulk?"Từ chối tất cả yêu cầu":`Từ chối lịch — ${rejectModal.name||""}`}
+          onClose={()=>{setRejectModal(null);setRejectReason("");}} width={460}>
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
+            {!rejectModal._bulk && (
+              <div style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:T.surfaceAlt,borderRadius:T.r}}>
+                <Avatar name={rejectModal.name||""} size={36}/>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:T.ink}}>{rejectModal.name}</div>
+                  <div style={{fontSize:11,color:T.inkMuted}}>{rejectModal.dept} · {rejectModal.approver}</div>
+                  {rejectModal._swapReject&&rejectModal.pendingSwap&&(
+                    <div style={{fontSize:11,color:"#7C3AED",marginTop:2}}>🔄 Yêu cầu đổi {(rejectModal.pendingSwap.pairs||[]).length} ngày Remote</div>
+                  )}
+                </div>
+              </div>
+            )}
+            <div style={{padding:"10px 14px",background:T.dangerSoft,border:`1px solid ${T.danger}20`,borderRadius:T.rSm,fontSize:12,color:T.danger}}>
+              ⚠ Nhân viên sẽ nhận thông báo lý do từ chối và cần điều chỉnh lại lịch.
+            </div>
+            <div>
+              <label style={{display:"block",fontSize:12,fontWeight:600,color:T.inkSoft,marginBottom:5}}>
+                Lý do từ chối * <span style={{color:T.danger,fontSize:11}}>(Bắt buộc, tối thiểu 10 ký tự)</span>
+              </label>
+              <textarea rows={4} placeholder="VD: Ngày 15/06 công ty yêu cầu toàn bộ team tham dự workshop tại văn phòng..."
+                value={rejectReason} onChange={e=>setRejectReason(e.target.value)}
+                style={{width:"100%",padding:"9px 12px",borderRadius:T.rSm,border:`1.5px solid ${rejectReason.trim().length>=10?T.danger:rejectReason?T.warning:T.border}`,fontSize:13,fontFamily:T.fontB,resize:"vertical",boxSizing:"border-box",outline:"none"}} />
+              <div style={{textAlign:"right",fontSize:11,color:rejectReason.trim().length<10&&rejectReason?T.warning:T.inkMuted,marginTop:2}}>
+                {rejectReason.length} ký tự{rejectReason.trim().length<10&&rejectReason?` (cần thêm ${10-rejectReason.trim().length})`:""}
+              </div>
+            </div>
+            <div style={{display:"flex",gap:10,justifyContent:"flex-end",paddingTop:4,borderTop:`1px solid ${T.borderLight}`}}>
+              <Btn v="secondary" onClick={()=>{setRejectModal(null);setRejectReason("");}}>Hủy</Btn>
+              <Btn v="danger" disabled={rejectReason.trim().length<10}
+                onClick={()=>{
+                  if(rejectReason.trim().length<10) return;
+                  if(rejectModal._bulk){
+                    setEmps(prev=>prev.map(e=>e.status==="pending"||e.status==="pending_swap"
+                      ?{...e,status:"rejected",rejectedReason:rejectReason,rejectedBy:"Trần Thị Ngọc",rejectedAt:"Vừa xong"}:e));
+                  } else if(rejectModal._swapReject){
+                    setEmps(prev=>prev.map(e=>e.id===rejectModal.id?{...e,status:"approved",pendingSwap:null}:e));
+                  } else {
+                    confirmReject();
+                  }
+                  setRejectModal(null);setRejectReason("");
+                }}>
+                ✕ Xác nhận từ chối
+              </Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Swap Modal ── */}
+      {swapModal && (() => {
+        // R days available in current month for this emp
+        const remoteDays = days.map((d,i) => {
+          const dw = d.getDay();
+          if (dw===0||dw===6||swapModal.schedule?.[i]!=="R") return null;
+          return { i, d };
+        }).filter(Boolean);
+
+        const selectedIdxs = new Set(swapForm.pairs.map(p => p.fromIdx));
+
+        const toggleSelect = (idx) => {
+          if (selectedIdxs.has(idx)) {
+            setSwapForm(p => ({ ...p, pairs: p.pairs.filter(pp => pp.fromIdx !== idx) }));
+          } else {
+            setSwapForm(p => ({ ...p, pairs: [...p.pairs, { fromIdx: idx, toDate:"" }] }));
+          }
+        };
+
+        const updateToDate = (fromIdx, toDate) =>
+          setSwapForm(p => ({ ...p, pairs: p.pairs.map(pp => pp.fromIdx===fromIdx ? {...pp,toDate} : pp) }));
+
+        // Validation
+        const allToDates  = swapForm.pairs.map(p => p.toDate).filter(Boolean);
+        const hasDupTo    = allToDates.length !== new Set(allToDates).size;
+        const allFilled   = swapForm.pairs.length > 0 && swapForm.pairs.every(p => p.toDate);
+        const existingR   = new Set(remoteDays.map(({d}) => d.toISOString().slice(0,10)));
+        const newDateConflict = swapForm.pairs.some(p => existingR.has(p.toDate));
+        const canSubmit   = allFilled && !hasDupTo && !newDateConflict && swapForm.reason.trim();
+
+        const fmtD = (d) => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
+
+        return (
+          <Modal title="🔄 Request Remote Schedule Change" onClose={()=>setSwapModal(null)} width={560}>
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
+
+              {/* Header */}
+              <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 14px",background:T.surfaceAlt,borderRadius:T.r}}>
+                <Avatar name={swapModal.name} size={32}/>
+                <div>
+                  <div style={{fontSize:13,fontWeight:700,color:T.ink}}>{swapModal.name}</div>
+                  <div style={{fontSize:11,color:T.inkMuted}}>Lịch đã duyệt · Người duyệt: {swapModal.approver}</div>
+                </div>
+                <Badge color={T.success} bg={T.successSoft} dot style={{marginLeft:"auto"}}>Đã duyệt</Badge>
+              </div>
+
+              <div style={{padding:"9px 12px",background:"#EDE9FE",border:"1px solid #7C3AED20",borderRadius:T.rSm,fontSize:12,color:"#5B21B6"}}>
+                ℹ Chọn các ngày Remote cần đổi, sau đó điền ngày mới tương ứng. Yêu cầu sẽ gửi cho người duyệt xác nhận.
+              </div>
+
+              {/* Step 1: Multi-select Remote days */}
+              <div>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                  <label style={{fontSize:12,fontWeight:700,color:T.inkSoft,textTransform:"uppercase",letterSpacing:"0.05em"}}>
+                    1. Chọn ngày Remote cần đổi
+                  </label>
+                  {remoteDays.length > 0 && (
+                    <button onClick={() => {
+                      if (selectedIdxs.size === remoteDays.length) {
+                        setSwapForm(p => ({ ...p, pairs:[] }));
+                      } else {
+                        setSwapForm(p => ({ ...p, pairs: remoteDays.map(({i}) => ({ fromIdx:i, toDate:"" })) }));
+                      }
+                    }} style={{fontSize:11,color:T.primary,background:"none",border:"none",cursor:"pointer",fontWeight:600}}>
+                      {selectedIdxs.size === remoteDays.length ? "Bỏ chọn tất cả" : "Chọn tất cả"}
+                    </button>
+                  )}
+                </div>
+                <div style={{border:`1px solid ${T.border}`,borderRadius:T.rSm,overflow:"hidden"}}>
+                  {/* Table header */}
+                  <div style={{display:"grid",gridTemplateColumns:"36px 1fr",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,padding:"7px 12px",gap:10}}>
+                    <div style={{fontSize:10,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.04em"}}>✓</div>
+                    <div style={{fontSize:10,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Current Approved Remote Date</div>
+                  </div>
+                  {remoteDays.length === 0 ? (
+                    <div style={{padding:"16px",textAlign:"center",fontSize:12,color:T.inkMuted}}>Không có ngày Remote nào trong tháng này</div>
+                  ) : remoteDays.map(({i,d},ri) => {
+                    const isSel = selectedIdxs.has(i);
+                    return (
+                      <div key={i} onClick={() => toggleSelect(i)}
+                        style={{display:"grid",gridTemplateColumns:"36px 1fr",padding:"9px 12px",gap:10,borderBottom:ri<remoteDays.length-1?`1px solid ${T.borderLight}`:"none",alignItems:"center",cursor:"pointer",background:isSel?"#FFFBEB":"white",transition:"background 0.1s"}}>
+                        <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${isSel?"#F59E0B":T.border}`,background:isSel?"#F59E0B":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                          {isSel && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                        </div>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <span style={{padding:"3px 10px",borderRadius:T.rSm,background:"#FFFBEB",border:"1px solid #FDE68A",fontSize:12,fontWeight:700,color:"#92400E",fontFamily:T.fontM}}>
+                            R
+                          </span>
+                          <span style={{fontSize:13,fontWeight:600,color:isSel?"#92400E":T.ink}}>
+                            {fmtD(d)} — {d.toLocaleDateString("vi-VN",{weekday:"short"})}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Step 2: Mapping table */}
+              {swapForm.pairs.length > 0 && (
+                <div>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                    <label style={{fontSize:12,fontWeight:700,color:T.inkSoft,textTransform:"uppercase",letterSpacing:"0.05em"}}>
+                      2. Nhập ngày Remote mới tương ứng
+                    </label>
+                    <span style={{fontSize:11,color:T.inkMuted}}>{swapForm.pairs.filter(p=>p.toDate).length}/{swapForm.pairs.length} đã điền</span>
+                  </div>
+                  <div style={{border:`1px solid ${T.border}`,borderRadius:T.rSm,overflow:"hidden"}}>
+                    {/* Header */}
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 24px 1fr",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,padding:"7px 14px",gap:8}}>
+                      {["Original Remote Date","","New Remote Date"].map((h,i)=>(
+                        <div key={i} style={{fontSize:10,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.04em",textAlign:i===1?"center":"left"}}>{h}</div>
+                      ))}
+                    </div>
+                    {/* Rows */}
+                    {swapForm.pairs.map((pair, pi) => {
+                      const origDay = days[pair.fromIdx];
+                      const toErr   = pair.toDate && existingR.has(pair.toDate);
+                      const dupErr  = pair.toDate && swapForm.pairs.filter(pp=>pp.toDate===pair.toDate).length>1;
+                      return (
+                        <div key={pair.fromIdx} style={{display:"grid",gridTemplateColumns:"1fr 24px 1fr",padding:"10px 14px",gap:8,borderBottom:pi<swapForm.pairs.length-1?`1px solid ${T.borderLight}`:"none",alignItems:"center",background:pi%2===0?"white":T.surfaceAlt}}>
+                          {/* From */}
+                          <div style={{display:"flex",alignItems:"center",gap:8}}>
+                            <span style={{padding:"4px 10px",borderRadius:T.rSm,background:"#FFFBEB",border:"1px solid #FDE68A",fontSize:12,fontWeight:700,color:"#92400E",fontFamily:T.fontM}}>R</span>
+                            <span style={{fontSize:13,fontWeight:600,color:"#92400E"}}>{fmtD(origDay)}</span>
+                          </div>
+                          {/* Arrow */}
+                          <div style={{textAlign:"center",color:T.inkMuted,fontSize:16}}>→</div>
+                          {/* To */}
+                          <div>
+                            <input type="date" value={pair.toDate}
+                              onChange={e => updateToDate(pair.fromIdx, e.target.value)}
+                              style={{width:"100%",padding:"7px 10px",borderRadius:T.rSm,border:`1.5px solid ${toErr||dupErr?T.danger:pair.toDate?"#7C3AED":T.border}`,fontSize:12,fontFamily:T.fontB,boxSizing:"border-box",outline:"none",background:pair.toDate?"#F5F3FF":"white"}} />
+                            {toErr && <div style={{fontSize:10,color:T.danger,marginTop:2}}>⚠ Ngày này đã là Remote</div>}
+                            {dupErr && <div style={{fontSize:10,color:T.danger,marginTop:2}}>⚠ Ngày trùng với dòng khác</div>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Validation warnings */}
+                  {hasDupTo && (
+                    <div style={{marginTop:8,padding:"8px 12px",background:T.dangerSoft,border:`1px solid ${T.danger}20`,borderRadius:T.rSm,fontSize:12,color:T.danger}}>
+                      ⚠ Có nhiều dòng chọn cùng một ngày mới. Mỗi ngày mới phải khác nhau.
+                    </div>
+                  )}
+                  {newDateConflict && !hasDupTo && (
+                    <div style={{marginTop:8,padding:"8px 12px",background:T.dangerSoft,border:`1px solid ${T.danger}20`,borderRadius:T.rSm,fontSize:12,color:T.danger}}>
+                      ⚠ Ngày mới không được là ngày đã cấu hình Remote trong lịch.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step 3: Reason */}
+              <div>
+                <label style={{display:"block",fontSize:12,fontWeight:700,color:T.inkSoft,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:6}}>
+                  3. Lý do thay đổi *
+                </label>
+                <textarea rows={3} value={swapForm.reason} onChange={e=>setSwapForm(p=>({...p,reason:e.target.value}))}
+                  placeholder="VD: Có lịch họp khách hàng tại văn phòng vào các ngày đã đăng ký Remote..."
+                  style={{width:"100%",padding:"9px 12px",borderRadius:T.rSm,border:`1.5px solid ${swapForm.reason.trim()?T.primary:T.border}`,fontSize:13,fontFamily:T.fontB,resize:"vertical",boxSizing:"border-box",outline:"none"}} />
+              </div>
+
+              {/* Preview summary */}
+              {allFilled && swapForm.reason.trim() && !hasDupTo && !newDateConflict && (
+                <div style={{padding:"12px 14px",background:T.successSoft,border:`1px solid ${T.success}30`,borderRadius:T.r}}>
+                  <div style={{fontSize:11,fontWeight:700,color:T.success,marginBottom:8}}>📋 Tóm tắt — {swapForm.pairs.length} thay đổi</div>
+                  {swapForm.pairs.map((pair,pi) => {
+                    const origDay = days[pair.fromIdx];
+                    return (
+                      <div key={pi} style={{display:"flex",alignItems:"center",gap:10,marginBottom:pi<swapForm.pairs.length-1?6:0,fontSize:12}}>
+                        <span style={{padding:"3px 9px",borderRadius:T.rSm,background:"#FFFBEB",border:"1px solid #FDE68A",fontWeight:700,color:"#92400E",fontFamily:T.fontM,minWidth:68,textAlign:"center"}}>
+                          R · {fmtD(origDay)}
+                        </span>
+                        <span style={{color:T.inkMuted}}>→</span>
+                        <span style={{padding:"3px 9px",borderRadius:T.rSm,background:T.successSoft,border:`1px solid ${T.success}40`,fontWeight:700,color:T.success,fontFamily:T.fontM,minWidth:68,textAlign:"center"}}>
+                          R · {pair.toDate.slice(8)}/{pair.toDate.slice(5,7)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div style={{display:"flex",gap:10,justifyContent:"flex-end",paddingTop:4,borderTop:`1px solid ${T.borderLight}`}}>
+                <Btn v="secondary" onClick={()=>setSwapModal(null)}>Hủy</Btn>
+                <Btn disabled={!canSubmit} onClick={confirmSwap}
+                  style={{background:canSubmit?"#7C3AED":"#D1D5DB",color:"white",border:"none"}}>
+                  🔄 Gửi yêu cầu đổi lịch ({swapForm.pairs.filter(p=>p.toDate).length} ngày)
+                </Btn>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
     </div>
   );
 };
