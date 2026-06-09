@@ -3745,17 +3745,33 @@ const WorkflowPage = () => {
     return false;
   })();
 
+  // ── Women's Benefit form states ─────────────────────────────
+  const [womenSubType, setWomenSubType] = useState("late");  // "late"|"early"
+  const [womenFrom,    setWomenFrom]    = useState("");
+  const [womenTo,      setWomenTo]      = useState("");
+  const [womenTime,    setWomenTime]    = useState("");
+  const [womenReason,  setWomenReason]  = useState("");
+  const WOMEN_POLICY = { quotaPerMonth:5, maxMinutes:30 };
+  const HOLIDAYS_WB  = ["2026-04-30","2026-05-01","2026-06-01"];  // dates off-limits
+
   const reqTypes = [
-    { id: "wfh", icon: "🏠", label: "WFH (Làm từ xa)", desc: "Làm việc tại nhà hoặc ngoài văn phòng", color: T.primary },
-    { id: "ot", icon: "⏰", label: "Làm thêm giờ (OT)", desc: "Đăng ký làm thêm ngoài giờ", color: T.accent },
-    { id: "travel", icon: "✈️", label: "Công tác", desc: "Đi công tác nội địa hoặc nước ngoài", color: "#6366F1" },
-    { id: "late", icon: "🕐", label: "Đi muộn / Về sớm", desc: "Xin phép đến muộn hoặc về sớm", color: T.warning },
-    { id: "docs", icon: "📄", label: "Xác nhận giấy tờ", desc: "Yêu cầu HR xác nhận công việc, lương...", color: "#E11D48" },
-    { id: "equipment", icon: "💻", label: "Thiết bị / Tài sản", desc: "Đề xuất cấp phát hoặc sửa chữa", color: "#059669" },
-    { id: "other", icon: "📋", label: "Yêu cầu khác", desc: "Các yêu cầu hành chính khác", color: T.inkMuted },
+    { id: "wfh",    icon: "🏠", label: "WFH (Làm từ xa)",       desc: "Làm việc tại nhà hoặc ngoài văn phòng",       color: T.primary  },
+    { id: "ot",     icon: "⏰", label: "Làm thêm giờ (OT)",      desc: "Đăng ký làm thêm ngoài giờ",                  color: T.accent   },
+    { id: "travel", icon: "✈️", label: "Công tác",               desc: "Đi công tác nội địa hoặc nước ngoài",         color: "#6366F1"  },
+    { id: "late",   icon: "🕐", label: "Đi muộn / Về sớm",       desc: "Xin phép đến muộn hoặc về sớm",               color: T.warning  },
+    { id: "women",  icon: "🌸", label: "Quyền lợi phụ nữ",       desc: "Đăng ký quyền lợi phụ nữ theo chính sách",    color: "#E11D48"  },
+    { id: "docs",   icon: "📄", label: "Xác nhận giấy tờ",       desc: "Yêu cầu HR xác nhận công việc, lương...",      color: "#0891B2"  },
+    { id: "equipment",icon:"💻",label: "Thiết bị / Tài sản",     desc: "Đề xuất cấp phát hoặc sửa chữa",              color: "#059669"  },
+    { id: "other",  icon: "📋", label: "Yêu cầu khác",           desc: "Các yêu cầu hành chính khác",                  color: T.inkMuted },
   ];
 
   const [reqs, setReqs] = useState([
+    { id: "WF-043", type: "Quyền lợi phụ nữ", by: "Lê Thị Mai",    date: "01/06→05/06", st: "approved", desc: "Late Arrival · 5 ngày", icon: "🌸", dept: "Design",  created: "01/06 08:45", approver: "Đinh Trọng Hưng",
+      womenBenefit:{ subType:"late", fromDate:"2026-06-01", toDate:"2026-06-05", appliedDays:["2026-06-01","2026-06-02","2026-06-03","2026-06-04","2026-06-05"], duration:30, quotaUsed:3, quotaTotal:5 },
+      history:[{step:"Tạo yêu cầu",by:"Lê Thị Mai",time:"01/06 08:45",cancel:false},{step:"Auto Approved",by:"Hệ thống",time:"01/06 08:45",cancel:false}] },
+    { id: "WF-044", type: "Quyền lợi phụ nữ", by: "Hoàng Thị Lan", date: "10/06→12/06", st: "pending",  desc: "Early Leave · 3 ngày",  icon: "🌸", dept: "Design",  created: "09/06 09:00", approver: "Đinh Trọng Hưng",
+      womenBenefit:{ subType:"early", fromDate:"2026-06-10", toDate:"2026-06-12", appliedDays:["2026-06-10","2026-06-11","2026-06-12"], duration:30, quotaUsed:1, quotaTotal:5 },
+      history:[{step:"Tạo yêu cầu",by:"Hoàng Thị Lan",time:"09/06 09:00",cancel:false},{step:"Chờ duyệt",by:"Đinh Trọng Hưng",time:"Đang chờ",cancel:false}] },
     { id: "WF-042", type: "WFH", by: "Nguyễn Văn An", date: "20/04", st: "pending_cancel", desc: "Làm remote cả tuần — dự án đang gấp", icon: "🏠", dept: "Engineering", created: "15/04 09:00", approver: "Đinh Trọng Hưng",
       cancelReason: "Tôi cần hủy yêu cầu WFH này do công ty yêu cầu toàn bộ team phải làm việc tại văn phòng trong tuần đó để chuẩn bị cho buổi demo với khách hàng.",
       history: [
@@ -4091,6 +4107,210 @@ const WorkflowPage = () => {
               <div style={{ display: "flex", gap: 10, justifyContent: "space-between" }}>
                 <Btn v="ghost" onClick={() => setModal("select")}>← Chọn lại</Btn>
                 <div style={{ display: "flex", gap: 10 }}><Btn v="secondary" onClick={() => setModal(null)}>Hủy</Btn><Btn>Gửi yêu cầu</Btn></div>
+              </div>
+            </div>
+          </Modal>
+        );
+      })()}
+
+      {/* ── WOMEN'S BENEFIT MODAL ── */}
+      {modal && modal.type === "women" && (() => {
+        const womenUsed   = reqs.filter(r => r.type==="Quyền lợi phụ nữ").length;
+        const womenRemain = Math.max(0, WOMEN_POLICY.quotaPerMonth - womenUsed);
+
+        // Calculate working days in range (excl. weekends + holidays)
+        const getWorkingDays = (from, to) => {
+          if (!from || !to || to < from) return [];
+          const days = []; const cur = new Date(from);
+          const end  = new Date(to);
+          while (cur <= end) {
+            const dw = cur.getDay();
+            const ds = cur.toISOString().slice(0,10);
+            if (dw!==0 && dw!==6 && !HOLIDAYS_WB.includes(ds)) days.push(ds);
+            cur.setDate(cur.getDate()+1);
+          }
+          return days;
+        };
+
+        const workDays   = getWorkingDays(womenFrom, womenTo);
+        const totalDays  = workDays.length;
+        const overQuota  = totalDays > womenRemain;
+        const remainAfter= Math.max(0, womenRemain - totalDays);
+        const canSubmit  = womenFrom && womenTo && womenTo>=womenFrom && totalDays>0 && !overQuota && !!womenTime;
+
+        const fmtDate = (ds) => {
+          const d = new Date(ds);
+          return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+        };
+
+        return (
+          <Modal title="🌸 Quyền lợi phụ nữ (Women's Benefit)" onClose={()=>setModal(null)} width={560}>
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
+
+              {/* Quota Balance Card */}
+              <div style={{borderRadius:T.r,border:"1.5px solid #FBCFE8",overflow:"hidden"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 14px",background:"#FDF2F8",borderBottom:"1px solid #FBCFE8"}}>
+                  <span style={{fontSize:14}}>🌸</span>
+                  <span style={{fontSize:12,fontWeight:700,color:"#9D174D",textTransform:"uppercase",letterSpacing:"0.05em"}}>Women's Benefit Balance — Tháng này</span>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",padding:"12px 14px",gap:8}}>
+                  {[
+                    {label:"Monthly Quota", value:`${WOMEN_POLICY.quotaPerMonth}`,  sub:"lần/tháng", color:"#9D174D"},
+                    {label:"Used",          value:`${womenUsed}`,                    sub:"đã dùng",   color:T.warning},
+                    {label:"Requesting",    value:`${totalDays||0}`,                 sub:"đang đăng", color:"#EC4899"},
+                    {label:"Remaining",     value:`${remainAfter}`,                  sub:"còn lại",   color:remainAfter>0?T.success:T.danger},
+                  ].map((s,i)=>(
+                    <div key={i} style={{textAlign:"center",padding:"4px 0"}}>
+                      <div style={{fontSize:9,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:4}}>{s.label}</div>
+                      <div style={{fontSize:20,fontWeight:800,fontFamily:T.fontD,color:s.color,lineHeight:1}}>{s.value}</div>
+                      <div style={{fontSize:9,color:T.inkMuted,marginTop:2}}>{s.sub}</div>
+                    </div>
+                  ))}
+                </div>
+                {/* Progress bar */}
+                <div style={{height:5,background:T.borderLight}}>
+                  <div style={{height:"100%",width:`${Math.min(100,((womenUsed+(totalDays||0))/WOMEN_POLICY.quotaPerMonth)*100)}%`,background:overQuota?T.danger:"#EC4899",borderRadius:"0 3px 3px 0",transition:"width 0.3s"}}/>
+                </div>
+                {womenRemain===0 && <div style={{padding:"7px 14px",background:T.dangerSoft,fontSize:11,color:T.danger,fontWeight:600}}>⚠ Bạn đã hết quota quyền lợi phụ nữ trong tháng này.</div>}
+              </div>
+
+              {/* Benefit Type (only late/early) */}
+              <div>
+                <label style={{display:"block",fontSize:12,fontWeight:600,color:T.inkSoft,marginBottom:8}}>Loại quyền lợi *</label>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+                  {[
+                    {v:"late",  icon:"🌅", label:"Đi muộn",    desc:"Đến trễ 30 phút · 08:00→08:30"},
+                    {v:"early", icon:"🌇", label:"Về sớm",     desc:"Về sớm 30 phút · 16:30→17:00"},
+                  ].map(opt=>(
+                    <div key={opt.v} onClick={()=>setWomenSubType(opt.v)}
+                      style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:T.r,cursor:"pointer",border:`2px solid ${womenSubType===opt.v?"#EC4899":T.border}`,background:womenSubType===opt.v?"#FDF2F8":T.surface,transition:"all 0.12s"}}>
+                      <span style={{fontSize:24,flexShrink:0}}>{opt.icon}</span>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:700,color:womenSubType===opt.v?"#9D174D":T.ink}}>{opt.label}</div>
+                        <div style={{fontSize:11,color:T.inkMuted,marginTop:2}}>{opt.desc}</div>
+                      </div>
+                      {womenSubType===opt.v && (
+                        <div style={{marginLeft:"auto",width:18,height:18,borderRadius:"50%",background:"#EC4899",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Date Range — Benefit Period */}
+              <div>
+                <label style={{display:"block",fontSize:12,fontWeight:700,color:T.inkSoft,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8}}>Benefit Period *</label>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 24px 1fr",gap:8,alignItems:"center"}}>
+                  <div>
+                    <label style={{display:"block",fontSize:11,color:T.inkMuted,marginBottom:4}}>From Date</label>
+                    <input type="date" value={womenFrom} onChange={e=>setWomenFrom(e.target.value)}
+                      style={{width:"100%",padding:"9px 12px",borderRadius:T.rSm,border:`1.5px solid ${womenFrom?"#EC4899":T.border}`,fontSize:13,fontFamily:T.fontB,boxSizing:"border-box",outline:"none",background:womenFrom?"#FDF2F8":T.surface}}/>
+                  </div>
+                  <div style={{textAlign:"center",color:T.inkMuted,fontSize:16,marginTop:16}}>→</div>
+                  <div>
+                    <label style={{display:"block",fontSize:11,color:T.inkMuted,marginBottom:4}}>To Date</label>
+                    <input type="date" value={womenTo} min={womenFrom||undefined} onChange={e=>setWomenTo(e.target.value)}
+                      style={{width:"100%",padding:"9px 12px",borderRadius:T.rSm,border:`1.5px solid ${womenTo?"#EC4899":T.border}`,fontSize:13,fontFamily:T.fontB,boxSizing:"border-box",outline:"none",background:womenTo?"#FDF2F8":T.surface}}/>
+                  </div>
+                </div>
+
+                {/* Actual time field */}
+                <div style={{marginTop:12}}>
+                  <label style={{display:"block",fontSize:12,fontWeight:600,color:T.inkSoft,marginBottom:5}}>
+                    {womenSubType==="late" ? "Giờ đến thực tế *" : "Giờ về thực tế *"}
+                  </label>
+                  <div style={{display:"flex",alignItems:"center",gap:12}}>
+                    <input type="time" value={womenTime} onChange={e=>setWomenTime(e.target.value)}
+                      style={{flex:"0 0 140px",padding:"9px 12px",borderRadius:T.rSm,border:`1.5px solid ${womenTime?"#EC4899":T.border}`,fontSize:15,fontFamily:T.fontM,fontWeight:700,color:"#9D174D",outline:"none",background:womenTime?"#FDF2F8":T.surface}}/>
+                    <div style={{fontSize:11,color:T.inkMuted}}>
+                      {womenSubType==="late"
+                        ? <span>Giờ chuẩn: <b>08:00</b>{womenTime&&new Date(`2000-01-01T${womenTime}`)>new Date("2000-01-01T08:00")?" · Muộn "+(Math.round((new Date(`2000-01-01T${womenTime}`)-new Date("2000-01-01T08:00"))/60000))+" phút":""}</span>
+                        : <span>Giờ chuẩn: <b>17:00</b>{womenTime&&new Date(`2000-01-01T${womenTime}`)<new Date("2000-01-01T17:00")?" · Về sớm "+(Math.round((new Date("2000-01-01T17:00")-new Date(`2000-01-01T${womenTime}`))/60000))+" phút":""}</span>
+                      }
+                    </div>
+                  </div>
+                  <div style={{fontSize:10,color:T.inkMuted,marginTop:3}}>
+                    Áp dụng cho tất cả {totalDays>0?totalDays:"các"} ngày trong khoảng đã chọn
+                  </div>
+                </div>
+
+                {/* Total Working Days chip */}
+                {womenFrom && womenTo && womenTo>=womenFrom && (
+                  <div style={{marginTop:10,display:"flex",alignItems:"center",gap:10,padding:"10px 14px",borderRadius:T.rSm,background:overQuota?T.dangerSoft:"#FDF2F8",border:`1px solid ${overQuota?"#FECACA":"#FBCFE8"}`}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:11,fontWeight:700,color:overQuota?T.danger:"#9D174D",marginBottom:2}}>Total Working Days</div>
+                      <div style={{fontSize:11,color:overQuota?T.danger:T.inkMuted}}>
+                        Không tính cuối tuần và ngày lễ
+                      </div>
+                    </div>
+                    <div style={{fontSize:28,fontWeight:800,fontFamily:T.fontD,color:overQuota?T.danger:"#EC4899"}}>{totalDays}</div>
+                    <div style={{fontSize:12,color:overQuota?T.danger:"#9D174D",fontWeight:600}}>ngày</div>
+                  </div>
+                )}
+                {overQuota && (
+                  <div style={{marginTop:6,padding:"8px 12px",background:T.dangerSoft,border:`1px solid ${T.danger}20`,borderRadius:T.rSm,fontSize:12,color:T.danger}}>
+                    ⚠ Tổng {totalDays} ngày vượt quota còn lại ({womenRemain} ngày). Vui lòng chọn khoảng thời gian ngắn hơn.
+                  </div>
+                )}
+              </div>
+
+              {/* Applied Dates Preview */}
+              {workDays.length > 0 && (
+                <div>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                    <label style={{fontSize:12,fontWeight:700,color:T.inkSoft,textTransform:"uppercase",letterSpacing:"0.05em"}}>Applied Dates Preview</label>
+                    <span style={{fontSize:11,color:"#9D174D",fontWeight:600}}>{workDays.length} ngày làm việc</span>
+                  </div>
+                  <div style={{border:`1px solid #FBCFE8`,borderRadius:T.rSm,overflow:"hidden",maxHeight:180,overflowY:"auto"}}>
+                    {workDays.map((ds, di) => (
+                      <div key={ds} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 12px",borderBottom:di<workDays.length-1?`1px solid #FDE7F3`:"none",background:di%2===0?"white":"#FDF2F8"}}>
+                        <div style={{width:20,height:20,borderRadius:"50%",background:"#EC4899",color:"white",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                          {di+1}
+                        </div>
+                        <span style={{fontSize:13,fontFamily:T.fontM,color:"#9D174D",fontWeight:600}}>{fmtDate(ds)}</span>
+                        <span style={{fontSize:10,color:T.inkMuted,marginLeft:"auto"}}>
+                          {new Date(ds).toLocaleDateString("vi-VN",{weekday:"short"})}
+                        </span>
+                        <span style={{fontSize:10,padding:"2px 8px",borderRadius:T.rFull,background:"#FDF2F8",border:"1px solid #FBCFE8",color:"#EC4899",fontWeight:700}}>
+                          {womenTime || (womenSubType==="late"?"08:00":"16:30")}
+                          {womenSubType==="late"?" → 08:30":" → 17:00"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Reason */}
+              <div>
+                <label style={{display:"block",fontSize:12,fontWeight:600,color:T.inkSoft,marginBottom:5}}>Lý do <span style={{fontSize:11,color:T.inkMuted}}>(không bắt buộc)</span></label>
+                <textarea rows={2} value={womenReason} onChange={e=>setWomenReason(e.target.value)}
+                  placeholder="VD: Cần đưa con đi khám bệnh định kỳ trong tuần này..."
+                  style={{width:"100%",padding:"9px 12px",borderRadius:T.rSm,border:`1px solid ${T.border}`,fontSize:13,fontFamily:T.fontB,resize:"vertical",boxSizing:"border-box"}}/>
+              </div>
+
+              {/* Approval flow */}
+              <div style={{padding:"10px 14px",background:T.surfaceAlt,borderRadius:T.r,fontSize:12}}>
+                <div style={{fontWeight:600,color:T.ink,marginBottom:4}}>Luồng phê duyệt</div>
+                <div style={{display:"flex",alignItems:"center",gap:6}}>
+                  <Badge color="#9D174D" bg="#FDF2F8">Bạn</Badge>
+                  <span style={{color:T.inkMuted}}>→</span>
+                  <Badge color={T.success} bg={T.successSoft}>✓ Auto Approved</Badge>
+                </div>
+                <div style={{fontSize:11,color:T.inkMuted,marginTop:4}}>Quyền lợi phụ nữ được tự động phê duyệt theo chính sách công ty.</div>
+              </div>
+
+              <div style={{display:"flex",gap:10,justifyContent:"space-between"}}>
+                <Btn v="ghost" onClick={()=>setModal("select")}>← Chọn lại</Btn>
+                <div style={{display:"flex",gap:10}}>
+                  <Btn v="secondary" onClick={()=>setModal(null)}>Hủy</Btn>
+                  <Btn disabled={!canSubmit}
+                    style={{background:canSubmit?"#EC4899":"#D1D5DB",color:"white",border:"none"}}>
+                    🌸 Gửi yêu cầu ({totalDays||0} ngày)
+                  </Btn>
+                </div>
               </div>
             </div>
           </Modal>
@@ -4570,6 +4790,55 @@ const WorkflowPage = () => {
               <div style={{ padding: "10px 14px", background: T.dangerSoft, border: `1px solid ${T.danger}30`, borderRadius: T.rSm, fontSize: 12, color: T.danger, display: "flex", alignItems: "center", gap: 8 }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                 Yêu cầu này đã bị hủy.
+              </div>
+            )}
+
+            {/* ── Women's Benefit Info ── */}
+            {detailReq.type==="Quyền lợi phụ nữ" && detailReq.womenBenefit && (
+              <div style={{borderRadius:T.r,border:"1.5px solid #FBCFE8",overflow:"hidden"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 14px",background:"#FDF2F8",borderBottom:"1px solid #FBCFE8"}}>
+                  <span style={{fontSize:14}}>🌸</span>
+                  <span style={{fontSize:11,fontWeight:700,color:"#9D174D",textTransform:"uppercase",letterSpacing:"0.05em"}}>Benefit Information</span>
+                </div>
+                {/* Info rows */}
+                {[
+                  ["Benefit Type", {late:"Late Arrival 🌅 (30 phút)",early:"Early Leave 🌇 (30 phút)"}[detailReq.womenBenefit.subType]||detailReq.womenBenefit.subType],
+                  ["Benefit Period", detailReq.womenBenefit.fromDate&&detailReq.womenBenefit.toDate
+                    ? `${new Date(detailReq.womenBenefit.fromDate).toLocaleDateString("vi-VN")} → ${new Date(detailReq.womenBenefit.toDate).toLocaleDateString("vi-VN")}`
+                    : "—"],
+                  ["Total Applied Days", `${(detailReq.womenBenefit.appliedDays||[]).length} ngày làm việc`],
+                ].map(([k,v],i)=>(
+                  <div key={i} style={{display:"flex",justifyContent:"space-between",padding:"8px 14px",borderBottom:`1px solid ${T.borderLight}`}}>
+                    <span style={{fontSize:12,color:T.inkMuted,fontWeight:600}}>{k}</span>
+                    <span style={{fontSize:13,color:T.ink,fontWeight:500}}>{v}</span>
+                  </div>
+                ))}
+                {/* Applied Dates */}
+                {(detailReq.womenBenefit.appliedDays||[]).length > 0 && (
+                  <div style={{padding:"10px 14px",borderBottom:`1px solid ${T.borderLight}`}}>
+                    <div style={{fontSize:10,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:8}}>Applied Dates</div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                      {(detailReq.womenBenefit.appliedDays||[]).map((ds,i)=>(
+                        <span key={i} style={{padding:"3px 10px",borderRadius:T.rFull,background:"#FDF2F8",border:"1px solid #FBCFE8",fontSize:11,fontFamily:T.fontM,fontWeight:600,color:"#9D174D"}}>
+                          {new Date(ds).toLocaleDateString("vi-VN",{day:"2-digit",month:"2-digit"})}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Quota summary */}
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",padding:"12px 14px",background:"#FDF2F8"}}>
+                  {[
+                    {label:"Monthly Quota", value:detailReq.womenBenefit.quotaTotal, color:"#9D174D"},
+                    {label:"Used",          value:detailReq.womenBenefit.quotaUsed,  color:T.warning},
+                    {label:"Remaining",     value:detailReq.womenBenefit.quotaTotal-detailReq.womenBenefit.quotaUsed, color:T.success},
+                  ].map((s,i)=>(
+                    <div key={i} style={{textAlign:"center"}}>
+                      <div style={{fontSize:9,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:3}}>{s.label}</div>
+                      <div style={{fontSize:16,fontWeight:800,fontFamily:T.fontD,color:s.color}}>{s.value}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -5860,6 +6129,29 @@ const SettingsPage = () => {
   const [otConfigDraft,   setOtConfigDraft]   = useState(null); // editing copy
   const [otSaveSuccess,   setOtSaveSuccess]   = useState(false);
 
+  // ── Women's Benefit Policy ───────────────────────────────────
+  const [womenPolicy, setWomenPolicy] = useState({
+    enabled:        true,
+    quotaPerMonth:  5,       // số lần/ngày tối đa trong tháng
+    maxMinutesPerDay: 30,    // số phút tối đa mỗi lần (mỗi ngày)
+    benefitTypes:   ["late","early"],  // loại được phép
+    approvalType:   "auto",  // "auto" | "manager"
+    applyTo:        "female", // "female" | "all" | "group"
+    resetDay:       1,        // ngày reset quota hàng tháng
+  });
+  const [womenPolicyDraft,  setWomenPolicyDraft]  = useState(null);
+  const [womenSaveSuccess,  setWomenSaveSuccess]  = useState(false);
+  const startEditWomen  = () => setWomenPolicyDraft(JSON.parse(JSON.stringify(womenPolicy)));
+  const cancelEditWomen = () => { setWomenPolicyDraft(null); setWomenSaveSuccess(false); };
+  const saveWomenPolicy = () => {
+    if (!womenPolicyDraft.quotaPerMonth || womenPolicyDraft.quotaPerMonth<1) return;
+    if (!womenPolicyDraft.maxMinutesPerDay || womenPolicyDraft.maxMinutesPerDay<1) return;
+    setWomenPolicy(JSON.parse(JSON.stringify(womenPolicyDraft)));
+    setWomenPolicyDraft(null);
+    setWomenSaveSuccess(true);
+    setTimeout(() => setWomenSaveSuccess(false), 3000);
+  };
+
   const startEditOt = () => setOtConfigDraft(JSON.parse(JSON.stringify(otConfig)));
   const cancelEditOt = () => { setOtConfigDraft(null); setOtSaveSuccess(false); };
 
@@ -6061,14 +6353,15 @@ const SettingsPage = () => {
 
   // ── sidebar config ───────────────────────────────────────────
   const systemTabs = [
-    { id: "org",      label: "Company Info",        icon: "🏢" },
-    { id: "schedule", label: "Working Schedule",    icon: "🗓" },
-    { id: "dept",     label: "Departments",         icon: "🏬" },
-    { id: "leave",    label: "Chính sách phép",     icon: "📋" },
-    { id: "approval", label: "Approval Workflow",   icon: "✅" },
-    { id: "roles",    label: "Roles & Permissions", icon: "🔐" },
-    { id: "otconfig", label: "OT Configuration",   icon: "⏱" },
-    { id: "notify",   label: "Notification",        icon: "🔔" },
+    { id: "org",         label: "Company Info",        icon: "🏢" },
+    { id: "schedule",    label: "Working Schedule",    icon: "🗓" },
+    { id: "dept",        label: "Departments",         icon: "🏬" },
+    { id: "leave",       label: "Chính sách phép",     icon: "📋" },
+    { id: "approval",    label: "Approval Workflow",   icon: "✅" },
+    { id: "roles",       label: "Roles & Permissions", icon: "🔐" },
+    { id: "otconfig",    label: "OT Configuration",    icon: "⏱" },
+    { id: "womenpolicy", label: "Women's Benefit",     icon: "🌸" },
+    { id: "notify",      label: "Notification",        icon: "🔔" },
   ];
   const personalTabs = [
     { id: "profile",       label: "My Profile",     icon: "👤" },
@@ -7833,6 +8126,223 @@ const SettingsPage = () => {
                         );
                       })}
                     </div>
+                  </div>
+                </Card>
+              </>
+            );
+          })()}
+
+          {/* ──────────────── WOMEN'S BENEFIT POLICY ──────────────── */}
+          {effectiveTab === "womenpolicy" && isAdmin && (() => {
+            const cfg     = womenPolicyDraft || womenPolicy;
+            const editing = !!womenPolicyDraft;
+
+            return (
+              <>
+                {/* Header */}
+                <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", marginBottom:4 }}>
+                  <div>
+                    <h3 style={{ fontFamily:T.fontD, fontSize:17, fontWeight:800, margin:"0 0 4px", color:T.ink }}>🌸 Women's Benefit Policy</h3>
+                    <p style={{ fontSize:12, color:T.inkMuted, margin:0 }}>Cấu hình quyền lợi thời gian làm việc dành cho nhân viên nữ</p>
+                  </div>
+                  <div style={{ display:"flex", gap:8 }}>
+                    {!editing ? (
+                      <Btn onClick={startEditWomen}><Ico d={IC.edit} size={14}/> Chỉnh sửa</Btn>
+                    ) : (
+                      <>
+                        <Btn v="secondary" onClick={cancelEditWomen}>Hủy</Btn>
+                        <Btn onClick={saveWomenPolicy}><Ico d={IC.check} size={14}/> Lưu thay đổi</Btn>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Success toast */}
+                {womenSaveSuccess && (
+                  <div style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 16px", background:T.successSoft, border:`1px solid ${T.success}30`, borderRadius:T.rSm }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.success} strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span style={{ fontSize:12, color:T.success, fontWeight:600 }}>Women's Benefit Policy đã được cập nhật thành công.</span>
+                  </div>
+                )}
+
+                {/* Section A — Core quota settings */}
+                <Card>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:20 }}>
+                    <div style={{ width:32, height:32, borderRadius:T.rSm, background:"#FDF2F8", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>📊</div>
+                    <div>
+                      <div style={{ fontFamily:T.fontD, fontSize:14, fontWeight:700, color:T.ink }}>Section A — Quota Configuration</div>
+                      <div style={{ fontSize:11, color:T.inkMuted }}>Số ngày và số giờ tối đa được phép sử dụng quyền lợi</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:20 }}>
+                    {/* Quota per month */}
+                    <div style={{ padding:"16px", borderRadius:T.r, border:`1.5px solid #FBCFE8`, background:"#FDF2F8" }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:12 }}>
+                        <span style={{ fontSize:18 }}>📅</span>
+                        <div style={{ fontSize:13, fontWeight:700, color:"#9D174D" }}>Số lần tối đa / tháng</div>
+                      </div>
+                      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                        {editing ? (
+                          <input type="number" min="1" max="31" value={womenPolicyDraft.quotaPerMonth}
+                            onChange={e => setWomenPolicyDraft(p => ({ ...p, quotaPerMonth: Number(e.target.value)||1 }))}
+                            style={{ width:80, padding:"10px 12px", borderRadius:T.rSm, border:`2px solid #EC4899`, fontSize:20, fontFamily:T.fontM, fontWeight:800, color:"#9D174D", textAlign:"center", outline:"none", background:"white" }}/>
+                        ) : (
+                          <div style={{ fontSize:32, fontWeight:800, fontFamily:T.fontD, color:"#EC4899" }}>{cfg.quotaPerMonth}</div>
+                        )}
+                        <div style={{ fontSize:14, color:"#9D174D", fontWeight:600 }}>lần / tháng</div>
+                      </div>
+                      <div style={{ fontSize:11, color:"#9D174D", marginTop:8, opacity:0.8 }}>
+                        Mỗi ngày làm việc được tính là 1 lần sử dụng
+                      </div>
+                    </div>
+
+                    {/* Max minutes per day */}
+                    <div style={{ padding:"16px", borderRadius:T.r, border:`1.5px solid #FBCFE8`, background:"#FDF2F8" }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:12 }}>
+                        <span style={{ fontSize:18 }}>⏱</span>
+                        <div style={{ fontSize:13, fontWeight:700, color:"#9D174D" }}>Số phút tối đa / ngày</div>
+                      </div>
+                      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                        {editing ? (
+                          <input type="number" min="1" max="480" value={womenPolicyDraft.maxMinutesPerDay}
+                            onChange={e => setWomenPolicyDraft(p => ({ ...p, maxMinutesPerDay: Number(e.target.value)||1 }))}
+                            style={{ width:80, padding:"10px 12px", borderRadius:T.rSm, border:`2px solid #EC4899`, fontSize:20, fontFamily:T.fontM, fontWeight:800, color:"#9D174D", textAlign:"center", outline:"none", background:"white" }}/>
+                        ) : (
+                          <div style={{ fontSize:32, fontWeight:800, fontFamily:T.fontD, color:"#EC4899" }}>{cfg.maxMinutesPerDay}</div>
+                        )}
+                        <div style={{ fontSize:14, color:"#9D174D", fontWeight:600 }}>phút / ngày</div>
+                      </div>
+                      <div style={{ fontSize:11, color:"#9D174D", marginTop:8, opacity:0.8 }}>
+                        Tối đa {cfg.maxMinutesPerDay} phút đi muộn <b>hoặc</b> về sớm mỗi ngày
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Reset day */}
+                  <div style={{ marginTop:16, display:"flex", alignItems:"center", gap:12, padding:"12px 14px", background:T.surfaceAlt, borderRadius:T.rSm, border:`1px solid ${T.border}` }}>
+                    <span style={{ fontSize:16 }}>🔄</span>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:12, fontWeight:600, color:T.ink }}>Reset quota hàng tháng</div>
+                      <div style={{ fontSize:11, color:T.inkMuted }}>Quota sẽ tự động reset vào ngày đầu tiên mỗi tháng</div>
+                    </div>
+                    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                      {editing ? (
+                        <input type="number" min="1" max="28" value={womenPolicyDraft.resetDay}
+                          onChange={e => setWomenPolicyDraft(p => ({ ...p, resetDay: Number(e.target.value)||1 }))}
+                          style={{ width:60, padding:"6px 8px", borderRadius:T.rSm, border:`1.5px solid ${T.primary}`, fontSize:13, fontFamily:T.fontM, fontWeight:700, textAlign:"center", outline:"none" }}/>
+                      ) : (
+                        <span style={{ fontSize:13, fontFamily:T.fontM, fontWeight:700, color:T.primary }}>Ngày {cfg.resetDay}</span>
+                      )}
+                      <span style={{ fontSize:12, color:T.inkMuted }}>hàng tháng</span>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Section B — Benefit types */}
+                <Card>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:16 }}>
+                    <div style={{ width:32, height:32, borderRadius:T.rSm, background:"#FDF2F8", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>🌸</div>
+                    <div>
+                      <div style={{ fontFamily:T.fontD, fontSize:14, fontWeight:700, color:T.ink }}>Section B — Benefit Types & Approval</div>
+                      <div style={{ fontSize:11, color:T.inkMuted }}>Cấu hình loại quyền lợi được phép và luồng phê duyệt</div>
+                    </div>
+                  </div>
+
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 }}>
+                    {/* Benefit types allowed */}
+                    <div>
+                      <label style={{ display:"block", fontSize:12, fontWeight:600, color:T.inkSoft, marginBottom:10 }}>Loại quyền lợi được phép</label>
+                      <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                        {[
+                          { v:"late",  icon:"🌅", label:"Late Arrival (Đi muộn)",  desc:`Tối đa ${cfg.maxMinutesPerDay} phút/ngày` },
+                          { v:"early", icon:"🌇", label:"Early Leave (Về sớm)",    desc:`Tối đa ${cfg.maxMinutesPerDay} phút/ngày` },
+                        ].map(opt => {
+                          const isSel = (cfg.benefitTypes||[]).includes(opt.v);
+                          return (
+                            <div key={opt.v}
+                              onClick={() => editing && setWomenPolicyDraft(p => ({
+                                ...p, benefitTypes: isSel ? p.benefitTypes.filter(x=>x!==opt.v) : [...(p.benefitTypes||[]),opt.v]
+                              }))}
+                              style={{ display:"flex", alignItems:"center", gap:10, padding:"10px 12px", borderRadius:T.rSm, border:`1.5px solid ${isSel?"#EC4899":T.border}`, background:isSel?"#FDF2F8":T.surface, cursor:editing?"pointer":"default", transition:"all 0.12s" }}>
+                              <span style={{ fontSize:18 }}>{opt.icon}</span>
+                              <div style={{ flex:1 }}>
+                                <div style={{ fontSize:12, fontWeight:600, color:isSel?"#9D174D":T.ink }}>{opt.label}</div>
+                                <div style={{ fontSize:10, color:T.inkMuted }}>{opt.desc}</div>
+                              </div>
+                              <div style={{ width:18, height:18, borderRadius:3, border:`2px solid ${isSel?"#EC4899":T.border}`, background:isSel?"#EC4899":"transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                {isSel && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Approval type + Apply to */}
+                    <div style={{ display:"flex", flexDirection:"column", gap:14 }}>
+                      <div>
+                        <label style={{ display:"block", fontSize:12, fontWeight:600, color:T.inkSoft, marginBottom:8 }}>Luồng phê duyệt</label>
+                        <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                          {[
+                            { v:"auto",    label:"Auto Approved",    desc:"Tự động duyệt ngay khi tạo" },
+                            { v:"manager", label:"Manager Approval", desc:"Cần Manager xác nhận" },
+                          ].map(opt => {
+                            const isSel = cfg.approvalType===opt.v;
+                            return (
+                              <div key={opt.v} onClick={()=>editing&&setWomenPolicyDraft(p=>({...p,approvalType:opt.v}))}
+                                style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 12px", borderRadius:T.rSm, border:`1.5px solid ${isSel?T.primary:T.border}`, background:isSel?T.primarySoft:T.surface, cursor:editing?"pointer":"default", transition:"all 0.12s" }}>
+                                <div style={{ width:14, height:14, borderRadius:"50%", border:`2px solid ${isSel?T.primary:T.border}`, background:isSel?T.primary:"transparent", flexShrink:0 }}>
+                                  {isSel && <div style={{ width:"100%", height:"100%", borderRadius:"50%", background:T.primary, display:"flex", alignItems:"center", justifyContent:"center" }}><div style={{ width:5, height:5, borderRadius:"50%", background:"white" }}/></div>}
+                                </div>
+                                <div>
+                                  <div style={{ fontSize:12, fontWeight:600, color:isSel?T.primary:T.ink }}>{opt.label}</div>
+                                  <div style={{ fontSize:10, color:T.inkMuted }}>{opt.desc}</div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label style={{ display:"block", fontSize:12, fontWeight:600, color:T.inkSoft, marginBottom:8 }}>Áp dụng cho</label>
+                        {editing ? (
+                          <select value={womenPolicyDraft.applyTo} onChange={e=>setWomenPolicyDraft(p=>({...p,applyTo:e.target.value}))}
+                            style={{ width:"100%", padding:"9px 12px", borderRadius:T.rSm, border:`1.5px solid ${T.border}`, fontSize:13, fontFamily:T.fontB }}>
+                            <option value="female">Nhân viên Nữ</option>
+                            <option value="all">Tất cả nhân viên</option>
+                          </select>
+                        ) : (
+                          <div style={{ padding:"9px 12px", borderRadius:T.rSm, background:T.surfaceAlt, border:`1px solid ${T.border}`, fontSize:13, color:T.ink }}>
+                            {cfg.applyTo==="female"?"👩 Nhân viên Nữ":"👥 Tất cả nhân viên"}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Summary preview */}
+                <Card style={{ background:"#FDF2F8", border:"1.5px solid #FBCFE8" }}>
+                  <div style={{ fontFamily:T.fontD, fontSize:13, fontWeight:700, color:"#9D174D", marginBottom:14 }}>📋 Tóm tắt chính sách hiện tại</div>
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, marginBottom:14 }}>
+                    {[
+                      { icon:"📅", label:"Quota tháng",     value:`${cfg.quotaPerMonth} ngày`,          note:"tối đa/tháng" },
+                      { icon:"⏱", label:"Thời lượng/ngày", value:`${cfg.maxMinutesPerDay} phút`,        note:`${Math.floor(cfg.maxMinutesPerDay/60)?Math.floor(cfg.maxMinutesPerDay/60)+"h ":""}${cfg.maxMinutesPerDay%60?""+cfg.maxMinutesPerDay%60+"m":""}` },
+                      { icon:"✅", label:"Phê duyệt",       value:cfg.approvalType==="auto"?"Auto":"Manager", note:cfg.approvalType==="auto"?"tự động duyệt":"cần xác nhận" },
+                    ].map((s,i)=>(
+                      <div key={i} style={{ padding:"12px 14px", borderRadius:T.rSm, background:"white", border:"1px solid #FBCFE8", textAlign:"center" }}>
+                        <div style={{ fontSize:20, marginBottom:4 }}>{s.icon}</div>
+                        <div style={{ fontSize:10, fontWeight:700, color:"#9D174D", textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:4 }}>{s.label}</div>
+                        <div style={{ fontSize:18, fontWeight:800, fontFamily:T.fontD, color:"#EC4899" }}>{s.value}</div>
+                        <div style={{ fontSize:10, color:"#9D174D", marginTop:2, opacity:0.8 }}>{s.note}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize:11, color:"#9D174D", padding:"8px 12px", background:"white", borderRadius:T.rSm, border:"1px solid #FBCFE8" }}>
+                    🌸 Áp dụng cho: <b>{cfg.applyTo==="female"?"Nhân viên Nữ":"Tất cả nhân viên"}</b> · Reset quota vào ngày <b>{cfg.resetDay}</b> hàng tháng ·
+                    Loại: <b>{(cfg.benefitTypes||[]).map(v=>v==="late"?"Đi muộn":"Về sớm").join(" & ")}</b>
                   </div>
                 </Card>
               </>
