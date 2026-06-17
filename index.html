@@ -630,12 +630,12 @@ const LeavePage = ({ onNav }) => {
 
   // Leave policy data enriched with workflow link
   const [leavePolicies, setLeavePolicies] = useState([
-    { id: 1, type: "Nghỉ phép năm",   days: 12,  unit: "ngày/năm", paid: true,  color: T.primary,   workflowId: 2, workflowRules: [{ wfId: 1, op: "<=", days: 2 }, { wfId: 2, op: ">=", days: 3 }], bonusDays: 2, bonusAvailableAfter: 3, seniorityRules: [{ years: 5, bonusDays: 1 }, { years: 10, bonusDays: 2 }, { years: 15, bonusDays: 3 }], desc: "Cộng dồn tối đa 5 ngày · Cho phép nửa ngày · +1 ngày/5 năm thâm niên" },
-    { id: 2, type: "Nghỉ ốm",         days: 30,  unit: "ngày/năm", paid: true,  color: T.danger,    workflowId: 3, workflowRules: [{ wfId: 3, op: ">=", days: 1 }], desc: "Hưởng BHXH · Yêu cầu giấy xác nhận y tế" },
-    { id: 3, type: "Nghỉ không lương",days: null, unit: "∞",        paid: false, color: T.inkMuted,  workflowId: 1, workflowRules: [{ wfId: 1, op: ">=", days: 1 }], desc: "Theo thỏa thuận" },
-    { id: 4, type: "Nghỉ cưới",       days: 3,   unit: "ngày/lần", paid: true,  color: "#EC4899",   workflowId: 1, workflowRules: [{ wfId: 1, op: ">=", days: 1 }], desc: "Bản thân kết hôn · Cần giấy đăng ký kết hôn" },
-    { id: 5, type: "Nghỉ tang",       days: 3,   unit: "ngày/lần", paid: true,  color: T.ink,       workflowId: 1, workflowRules: [{ wfId: 1, op: ">=", days: 1 }], desc: "Cha/mẹ/vợ-chồng/con: 3 ngày · Ông/bà: 1 ngày" },
-    { id: 6, type: "Thai sản",        days: 180, unit: "ngày",     paid: true,  color: "#7C3AED",   workflowId: 2, workflowRules: [{ wfId: 2, op: ">=", days: 1 }], desc: "Nữ: 6 tháng · Nam: 5–14 ngày · Theo luật BHXH" },
+    { id: 1, type: "Nghỉ phép năm",   days: 12,  unit: "ngày/năm", paid: true,  color: T.primary,   workflowId: 2, workflowRules: [{ wfId: 1, isDefault: false, fromDays: 0, toDays: 2 }, { wfId: 2, isDefault: true, fromDays: 3, toDays: 999 }], bonusDays: 2, bonusAvailableAfter: 3, seniorityRules: [{ years: 5, bonusDays: 1 }, { years: 10, bonusDays: 2 }, { years: 15, bonusDays: 3 }], desc: "Cộng dồn tối đa 5 ngày · Cho phép nửa ngày · +1 ngày/5 năm thâm niên" },
+    { id: 2, type: "Nghỉ ốm",         days: 30,  unit: "ngày/năm", paid: true,  color: T.danger,    workflowId: 3, workflowRules: [{ wfId: 3, isDefault: true, fromDays: 1, toDays: 999 }], desc: "Hưởng BHXH · Yêu cầu giấy xác nhận y tế" },
+    { id: 3, type: "Nghỉ không lương",days: null, unit: "∞",        paid: false, color: T.inkMuted,  workflowId: 1, workflowRules: [{ wfId: 1, isDefault: true, fromDays: 1, toDays: 999 }], desc: "Theo thỏa thuận" },
+    { id: 4, type: "Nghỉ cưới",       days: 3,   unit: "ngày/lần", paid: true,  color: "#EC4899",   workflowId: 1, workflowRules: [{ wfId: 1, isDefault: true, fromDays: 1, toDays: 999 }], desc: "Bản thân kết hôn · Cần giấy đăng ký kết hôn" },
+    { id: 5, type: "Nghỉ tang",       days: 3,   unit: "ngày/lần", paid: true,  color: T.ink,       workflowId: 1, workflowRules: [{ wfId: 1, isDefault: true, fromDays: 1, toDays: 999 }], desc: "Cha/mẹ/vợ-chồng/con: 3 ngày · Ông/bà: 1 ngày" },
+    { id: 6, type: "Thai sản",        days: 180, unit: "ngày",     paid: true,  color: "#7C3AED",   workflowId: 2, workflowRules: [{ wfId: 2, isDefault: true, fromDays: 1, toDays: 999 }], desc: "Nữ: 6 tháng · Nam: 5–14 ngày · Theo luật BHXH" },
   ]);
 
   const balances = [
@@ -1501,7 +1501,7 @@ const LeavePage = ({ onNav }) => {
                   </select>
                 </div>
 
-                {/* Workflow mapping — multi-rule */}
+                {/* Workflow mapping — range-based */}
                 <div style={{ borderTop: `1px dashed ${T.border}`, paddingTop: 14 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                     <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: T.inkSoft, textTransform: "uppercase", letterSpacing: "0.05em" }}>
@@ -1509,79 +1509,133 @@ const LeavePage = ({ onNav }) => {
                       Approval Workflow
                     </label>
                     <button
-                      onClick={() => setEditLeavePolicy(p => ({ ...p, workflowRules: [...(p.workflowRules || []), { wfId: approvalWorkflows[0]?.id || 1, op: ">=", days: 1 }] }))}
+                      onClick={() => setEditLeavePolicy(p => ({ ...p, workflowRules: [...(p.workflowRules || []), { wfId: approvalWorkflows[0]?.id || 1, isDefault: (p.workflowRules||[]).length === 0, fromDays: 0, toDays: 999 }] }))}
                       style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: T.rFull, border: `1px solid ${T.primary}`, background: T.primarySoft, color: T.primary, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
                     >
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                      Add Rule
+                      Add Workflow
                     </button>
                   </div>
 
                   {/* Rules table */}
-                  {(editLeavePolicy.workflowRules || []).length > 0 ? (
-                    <div style={{ border: `1px solid ${T.border}`, borderRadius: T.rSm, overflow: "hidden" }}>
-                      {/* Header */}
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 72px 80px 32px", background: T.surfaceAlt, borderBottom: `1px solid ${T.border}`, padding: "6px 10px", gap: 8 }}>
-                        {["Approval Workflow", "Điều kiện", "Số ngày", ""].map((h, i) => (
-                          <div key={i} style={{ fontSize: 10, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</div>
-                        ))}
-                      </div>
-                      {/* Rows */}
-                      {(editLeavePolicy.workflowRules || []).map((rule, ri) => (
-                        <div key={ri} style={{ display: "grid", gridTemplateColumns: "1fr 72px 80px 32px", padding: "8px 10px", gap: 8, borderBottom: ri < (editLeavePolicy.workflowRules || []).length - 1 ? `1px solid ${T.borderLight}` : "none", alignItems: "center", background: ri % 2 === 0 ? "white" : T.surfaceAlt }}>
-                          {/* Workflow select */}
-                          <select
-                            value={rule.wfId}
-                            onChange={e => setEditLeavePolicy(p => ({ ...p, workflowRules: p.workflowRules.map((r, i) => i === ri ? { ...r, wfId: Number(e.target.value) } : r) }))}
-                            style={{ width: "100%", padding: "6px 8px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 12, fontFamily: T.fontB, color: T.ink, background: "white", boxSizing: "border-box" }}
-                          >
-                            {approvalWorkflows.map(wf => <option key={wf.id} value={wf.id}>{wf.label}</option>)}
-                          </select>
-                          {/* Operator */}
-                          <select
-                            value={rule.op}
-                            onChange={e => setEditLeavePolicy(p => ({ ...p, workflowRules: p.workflowRules.map((r, i) => i === ri ? { ...r, op: e.target.value } : r) }))}
-                            style={{ width: "100%", padding: "6px 8px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontM, color: T.primary, fontWeight: 700, background: T.primarySoft, boxSizing: "border-box", textAlign: "center" }}
-                          >
-                            {["<=", "<", ">=", ">", "="].map(op => <option key={op} value={op}>{op}</option>)}
-                          </select>
-                          {/* Days input */}
-                          <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                            <input
-                              type="number" min="1"
-                              value={rule.days}
-                              onChange={e => setEditLeavePolicy(p => ({ ...p, workflowRules: p.workflowRules.map((r, i) => i === ri ? { ...r, days: Number(e.target.value) || 1 } : r) }))}
-                              style={{ width: "100%", padding: "6px 6px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 12, fontFamily: T.fontB, color: T.ink, background: "white", boxSizing: "border-box", textAlign: "center" }}
-                            />
-                            <span style={{ fontSize: 10, color: T.inkMuted, whiteSpace: "nowrap" }}>ngày</span>
-                          </div>
-                          {/* Remove */}
-                          <button
-                            onClick={() => setEditLeavePolicy(p => ({ ...p, workflowRules: p.workflowRules.filter((_, i) => i !== ri) }))}
-                            style={{ width: 26, height: 26, borderRadius: T.rSm, border: "none", background: T.dangerSoft, color: T.danger, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, flexShrink: 0 }}
-                          >✕</button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={{ padding: "20px", textAlign: "center", background: T.surfaceAlt, borderRadius: T.rSm, border: `1px dashed ${T.border}` }}>
-                      <div style={{ fontSize: 13, color: T.inkMuted, marginBottom: 6 }}>Chưa có rule phê duyệt nào</div>
-                      <div style={{ fontSize: 11, color: T.inkMuted }}>Nhấn <b>Add Rule</b> để thêm điều kiện phê duyệt</div>
-                    </div>
-                  )}
+                  {(editLeavePolicy.workflowRules || []).length > 0 ? (() => {
+                    const rules = editLeavePolicy.workflowRules || [];
 
-                  {/* Preview logic */}
-                  {(editLeavePolicy.workflowRules || []).length > 0 && (
-                    <div style={{ marginTop: 10, padding: "8px 12px", background: T.infoSoft, borderRadius: T.rSm, fontSize: 11, color: T.info }}>
-                      <div style={{ fontWeight: 700, marginBottom: 4 }}>Ví dụ áp dụng:</div>
-                      {(editLeavePolicy.workflowRules || []).map((rule, ri) => {
-                        const wf = approvalWorkflows.find(w => w.id === rule.wfId);
-                        return (
-                          <div key={ri} style={{ marginBottom: 2 }}>
-                            • Nghỉ <b>{rule.op} {rule.days} ngày</b> → <b>{wf?.label || "—"}</b>
+                    // Validation
+                    const hasMultiDefault = rules.filter(r => r.isDefault).length > 1;
+                    const hasOverlap = (() => {
+                      for (let i = 0; i < rules.length; i++)
+                        for (let j = i+1; j < rules.length; j++)
+                          if (rules[i].fromDays <= rules[j].toDays && rules[j].fromDays <= rules[i].toDays) return true;
+                      return false;
+                    })();
+                    const hasGap = (() => {
+                      if (rules.length < 2) return false;
+                      const sorted = [...rules].sort((a,b) => a.fromDays - b.fromDays);
+                      for (let i = 1; i < sorted.length; i++)
+                        if (sorted[i].fromDays > sorted[i-1].toDays + 1) return true;
+                      return false;
+                    })();
+                    const hasFromGtTo = rules.some(r => r.fromDays > r.toDays);
+
+                    return (
+                      <>
+                        <div style={{ border: `1px solid ${T.border}`, borderRadius: T.rSm, overflow: "hidden" }}>
+                          {/* Header */}
+                          <div style={{ display: "grid", gridTemplateColumns: "36px 1fr 72px 72px 32px", background: T.surfaceAlt, borderBottom: `1px solid ${T.border}`, padding: "6px 10px", gap: 8, alignItems: "center" }}>
+                            {["Default", "Approval Workflow", "From Days", "To Days", ""].map((h, i) => (
+                              <div key={i} style={{ fontSize: 10, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.04em", textAlign: i===0?"center":"left" }}>{h}</div>
+                            ))}
                           </div>
-                        );
-                      })}
+                          {/* Rows */}
+                          {rules.map((rule, ri) => {
+                            const fromGtTo = rule.fromDays > rule.toDays;
+                            const rowOverlap = (() => {
+                              if (!hasOverlap) return false;
+                              return rules.some((other, j) => j !== ri && rule.fromDays <= other.toDays && other.fromDays <= rule.toDays);
+                            })();
+                            return (
+                              <div key={ri} style={{ display: "grid", gridTemplateColumns: "36px 1fr 72px 72px 32px", padding: "8px 10px", gap: 8, borderBottom: ri < rules.length-1 ? `1px solid ${T.borderLight}` : "none", alignItems: "center", background: rowOverlap ? "#FFF7ED" : ri%2===0 ? "white" : T.surfaceAlt }}>
+                                {/* Default radio */}
+                                <div style={{ display: "flex", justifyContent: "center" }}>
+                                  <div onClick={() => setEditLeavePolicy(p => ({ ...p, workflowRules: p.workflowRules.map((r,i) => ({ ...r, isDefault: i===ri })) }))}
+                                    style={{ width: 18, height: 18, borderRadius: "50%", border: `2px solid ${rule.isDefault ? T.primary : T.border}`, background: rule.isDefault ? T.primary : "white", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.1s" }}>
+                                    {rule.isDefault && <div style={{ width: 7, height: 7, borderRadius: "50%", background: "white" }}/>}
+                                  </div>
+                                </div>
+                                {/* Workflow select */}
+                                <select value={rule.wfId}
+                                  onChange={e => setEditLeavePolicy(p => ({ ...p, workflowRules: p.workflowRules.map((r,i) => i===ri ? { ...r, wfId: Number(e.target.value) } : r) }))}
+                                  style={{ width: "100%", padding: "6px 8px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 12, fontFamily: T.fontB, color: T.ink, background: "white", boxSizing: "border-box" }}>
+                                  {approvalWorkflows.map(wf => <option key={wf.id} value={wf.id}>{wf.label}</option>)}
+                                </select>
+                                {/* From Days */}
+                                <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                                  <input type="number" min="0" value={rule.fromDays}
+                                    onChange={e => setEditLeavePolicy(p => ({ ...p, workflowRules: p.workflowRules.map((r,i) => i===ri ? { ...r, fromDays: Number(e.target.value)||0 } : r) }))}
+                                    style={{ width: "100%", padding: "6px 6px", borderRadius: T.rSm, border: `1px solid ${fromGtTo||rowOverlap?T.danger:T.border}`, fontSize: 12, textAlign: "center", boxSizing: "border-box" }}/>
+                                </div>
+                                {/* To Days */}
+                                <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                                  <input type="number" min="0" value={rule.toDays}
+                                    onChange={e => setEditLeavePolicy(p => ({ ...p, workflowRules: p.workflowRules.map((r,i) => i===ri ? { ...r, toDays: Number(e.target.value)||0 } : r) }))}
+                                    style={{ width: "100%", padding: "6px 6px", borderRadius: T.rSm, border: `1px solid ${fromGtTo||rowOverlap?T.danger:T.border}`, fontSize: 12, textAlign: "center", boxSizing: "border-box" }}/>
+                                </div>
+                                {/* Delete */}
+                                <button onClick={() => setEditLeavePolicy(p => ({ ...p, workflowRules: p.workflowRules.filter((_,i) => i!==ri) }))}
+                                  style={{ width: 26, height: 26, borderRadius: T.rSm, border: "none", background: T.dangerSoft, color: T.danger, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, flexShrink: 0 }}>✕</button>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Validation messages */}
+                        {hasFromGtTo && (
+                          <div style={{ marginTop: 7, padding: "7px 11px", background: T.dangerSoft, border: `1px solid ${T.danger}20`, borderRadius: T.rSm, fontSize: 12, color: T.danger }}>
+                            ⚠ From Days phải nhỏ hơn hoặc bằng To Days.
+                          </div>
+                        )}
+                        {hasOverlap && !hasFromGtTo && (
+                          <div style={{ marginTop: 7, padding: "7px 11px", background: T.dangerSoft, border: `1px solid ${T.danger}20`, borderRadius: T.rSm, fontSize: 12, color: T.danger }}>
+                            ⚠ Approval workflow ranges cannot overlap.
+                          </div>
+                        )}
+                        {hasGap && !hasOverlap && !hasFromGtTo && (
+                          <div style={{ marginTop: 7, padding: "7px 11px", background: T.warningSoft, border: `1px solid ${T.warning}20`, borderRadius: T.rSm, fontSize: 12, color: T.warning }}>
+                            ⚠ There is a gap between workflow ranges. Đơn nghỉ trong khoảng trống sẽ dùng Default Workflow.
+                          </div>
+                        )}
+                        {hasMultiDefault && (
+                          <div style={{ marginTop: 7, padding: "7px 11px", background: T.dangerSoft, border: `1px solid ${T.danger}20`, borderRadius: T.rSm, fontSize: 12, color: T.danger }}>
+                            ⚠ Chỉ được chọn 1 workflow là Default.
+                          </div>
+                        )}
+                        {rules.filter(r=>r.isDefault).length === 0 && rules.length > 0 && (
+                          <div style={{ marginTop: 7, padding: "7px 11px", background: T.warningSoft, border: `1px solid ${T.warning}20`, borderRadius: T.rSm, fontSize: 12, color: T.warning }}>
+                            ⚠ Hãy chọn 1 workflow làm Default để xử lý các trường hợp không khớp.
+                          </div>
+                        )}
+
+                        {/* Preview */}
+                        {!hasOverlap && !hasFromGtTo && (
+                          <div style={{ marginTop: 10, padding: "8px 12px", background: T.infoSoft, borderRadius: T.rSm, fontSize: 11, color: T.info }}>
+                            <div style={{ fontWeight: 700, marginBottom: 4 }}>Logic áp dụng:</div>
+                            {[...rules].sort((a,b)=>a.fromDays-b.fromDays).map((rule, ri) => {
+                              const wf = approvalWorkflows.find(w => w.id === rule.wfId);
+                              return (
+                                <div key={ri} style={{ marginBottom: 2 }}>
+                                  • Nghỉ <b>{rule.fromDays}–{rule.toDays === 999 ? "∞" : rule.toDays} ngày</b> → <b>{wf?.label || "—"}</b>{rule.isDefault ? <span style={{ marginLeft: 4, padding: "1px 6px", borderRadius: 3, background: T.primary, color: "white", fontSize: 9, fontWeight: 700 }}>Default</span> : ""}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })() : (
+                    <div style={{ padding: "20px", textAlign: "center", background: T.surfaceAlt, borderRadius: T.rSm, border: `1px dashed ${T.border}` }}>
+                      <div style={{ fontSize: 13, color: T.inkMuted, marginBottom: 6 }}>Chưa có workflow phê duyệt nào</div>
+                      <div style={{ fontSize: 11, color: T.inkMuted }}>Nhấn <b>Add Workflow</b> để cấu hình</div>
                     </div>
                   )}
                   <div style={{ fontSize: 11, color: T.inkMuted, marginTop: 8 }}>
@@ -6200,13 +6254,13 @@ const SettingsPage = () => {
 
   // ── data ─────────────────────────────────────────────────────
   const [leaveTypes, setLeaveTypes] = useState([
-    { id: 1, name: "Nghỉ phép năm",   days: 12,  unit: "ngày/năm",     paid: true,  carry: true,  maxCarry: 5, halfDay: true,  probation: false, seniorityBonus: "+1 ngày / 5 năm", seniorityRules: [{ years: 5, bonusDays: 1 }, { years: 10, bonusDays: 2 }, { years: 15, bonusDays: 3 }], docs: false, color: T.primary,  workflowId: 2, workflowRules: [{ wfId: 1, op: "<=", days: 2 }, { wfId: 2, op: ">=", days: 3 }], bonusDays: 2, bonusAvailableAfter: 3, desc: "Theo Điều 113 Bộ luật Lao động 2019" },
-    { id: 2, name: "Nghỉ ốm",         days: 30,  unit: "ngày/năm",     paid: true,  carry: false, maxCarry: 0, halfDay: true,  probation: true,  docs: true,  docsDesc: "Giấy xác nhận y tế",      color: T.danger,   workflowId: 3, workflowRules: [{ wfId: 3, op: ">=", days: 1 }], desc: "Hưởng BHXH, tối đa 30 ngày/năm (đóng < 15 năm)" },
-    { id: 3, name: "Nghỉ không lương",days: null, unit: "không giới hạn",paid: false, carry: false, maxCarry: 0, halfDay: false, probation: false, docs: false, color: T.inkMuted,  workflowId: 1, workflowRules: [{ wfId: 1, op: ">=", days: 1 }], desc: "Theo thỏa thuận giữa NLĐ và NSDLĐ" },
-    { id: 4, name: "Nghỉ cưới",       days: 3,   unit: "ngày/lần",     paid: true,  carry: false, maxCarry: 0, halfDay: false, probation: true,  docs: true,  docsDesc: "Giấy đăng ký kết hôn",    color: "#EC4899",  workflowId: 1, workflowRules: [{ wfId: 1, op: ">=", days: 1 }], desc: "Điều 115 BLLĐ — bản thân kết hôn" },
-    { id: 5, name: "Nghỉ tang",       days: 3,   unit: "ngày/lần",     paid: true,  carry: false, maxCarry: 0, halfDay: false, probation: true,  docs: true,  docsDesc: "Giấy báo tử",             color: T.ink,      workflowId: 1, workflowRules: [{ wfId: 1, op: ">=", days: 1 }], desc: "Cha/mẹ/vợ-chồng/con mất: 3 ngày, ông/bà: 1 ngày" },
-    { id: 6, name: "Nghỉ thai sản",   days: 180, unit: "ngày",         paid: true,  carry: false, maxCarry: 0, halfDay: false, probation: false, docs: true,  docsDesc: "Giấy xác nhận thai sản",  color: "#7C3AED",  workflowId: 2, workflowRules: [{ wfId: 2, op: ">=", days: 1 }], desc: "Nữ: 6 tháng, Nam: 5-14 ngày — theo luật BHXH" },
-    { id: 7, name: "Nghỉ hiếu sự con",days: 1,   unit: "ngày/lần",     paid: true,  carry: false, maxCarry: 0, halfDay: false, probation: true,  docs: false, color: T.accent,   workflowId: 1, workflowRules: [{ wfId: 1, op: ">=", days: 1 }], desc: "Con kết hôn: 1 ngày (Điều 115 BLLĐ)" },
+    { id: 1, name: "Nghỉ phép năm",   days: 12,  unit: "ngày/năm",     paid: true,  carry: true,  maxCarry: 5, halfDay: true,  probation: false, seniorityBonus: "+1 ngày / 5 năm", seniorityRules: [{ years: 5, bonusDays: 1 }, { years: 10, bonusDays: 2 }, { years: 15, bonusDays: 3 }], docs: false, color: T.primary,  workflowId: 2, workflowRules: [{ wfId: 1, isDefault: false, fromDays: 0, toDays: 2 }, { wfId: 2, isDefault: true, fromDays: 3, toDays: 999 }], bonusDays: 2, bonusAvailableAfter: 3, desc: "Theo Điều 113 Bộ luật Lao động 2019" },
+    { id: 2, name: "Nghỉ ốm",         days: 30,  unit: "ngày/năm",     paid: true,  carry: false, maxCarry: 0, halfDay: true,  probation: true,  docs: true,  docsDesc: "Giấy xác nhận y tế",      color: T.danger,   workflowId: 3, workflowRules: [{ wfId: 3, isDefault: true, fromDays: 1, toDays: 999 }], desc: "Hưởng BHXH, tối đa 30 ngày/năm (đóng < 15 năm)" },
+    { id: 3, name: "Nghỉ không lương",days: null, unit: "không giới hạn",paid: false, carry: false, maxCarry: 0, halfDay: false, probation: false, docs: false, color: T.inkMuted,  workflowId: 1, workflowRules: [{ wfId: 1, isDefault: true, fromDays: 1, toDays: 999 }], desc: "Theo thỏa thuận giữa NLĐ và NSDLĐ" },
+    { id: 4, name: "Nghỉ cưới",       days: 3,   unit: "ngày/lần",     paid: true,  carry: false, maxCarry: 0, halfDay: false, probation: true,  docs: true,  docsDesc: "Giấy đăng ký kết hôn",    color: "#EC4899",  workflowId: 1, workflowRules: [{ wfId: 1, isDefault: true, fromDays: 1, toDays: 999 }], desc: "Điều 115 BLLĐ — bản thân kết hôn" },
+    { id: 5, name: "Nghỉ tang",       days: 3,   unit: "ngày/lần",     paid: true,  carry: false, maxCarry: 0, halfDay: false, probation: true,  docs: true,  docsDesc: "Giấy báo tử",             color: T.ink,      workflowId: 1, workflowRules: [{ wfId: 1, isDefault: true, fromDays: 1, toDays: 999 }], desc: "Cha/mẹ/vợ-chồng/con mất: 3 ngày, ông/bà: 1 ngày" },
+    { id: 6, name: "Nghỉ thai sản",   days: 180, unit: "ngày",         paid: true,  carry: false, maxCarry: 0, halfDay: false, probation: false, docs: true,  docsDesc: "Giấy xác nhận thai sản",  color: "#7C3AED",  workflowId: 2, workflowRules: [{ wfId: 2, isDefault: true, fromDays: 1, toDays: 999 }], desc: "Nữ: 6 tháng, Nam: 5-14 ngày — theo luật BHXH" },
+    { id: 7, name: "Nghỉ hiếu sự con",days: 1,   unit: "ngày/lần",     paid: true,  carry: false, maxCarry: 0, halfDay: false, probation: true,  docs: false, color: T.accent,   workflowId: 1, workflowRules: [{ wfId: 1, isDefault: true, fromDays: 1, toDays: 999 }], desc: "Con kết hôn: 1 ngày (Điều 115 BLLĐ)" },
   ]);
 
   const approvalFlows = [
@@ -7287,7 +7341,7 @@ const SettingsPage = () => {
                       <Input label="Mô tả giấy tờ cần có" value={editLeave.docsDesc || ""} placeholder="VD: Giấy xác nhận y tế..." onChange={e => setEditLeave(p => ({ ...p, docsDesc: e.target.value }))} />
                     )}
 
-                    {/* ── Approval Workflow Mapping (multi-rule) ── */}
+                    {/* ── Approval Workflow Mapping (range-based) ── */}
                     <div style={{ borderTop: `1px solid ${T.borderLight}`, paddingTop: 14 }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                         <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12, fontWeight: 700, color: T.inkSoft, textTransform: "uppercase", letterSpacing: "0.06em" }}>
@@ -7295,73 +7349,90 @@ const SettingsPage = () => {
                           Approval Workflow
                         </label>
                         <button
-                          onClick={() => setEditLeave(p => ({ ...p, workflowRules: [...(p.workflowRules || []), { wfId: approvalFlows[0]?.id || 1, op: ">=", days: 1 }] }))}
+                          onClick={() => setEditLeave(p => ({ ...p, workflowRules: [...(p.workflowRules || []), { wfId: approvalFlows[0]?.id || 1, isDefault: (p.workflowRules||[]).length === 0, fromDays: 0, toDays: 999 }] }))}
                           style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: T.rFull, border: `1px solid ${T.primary}`, background: T.primarySoft, color: T.primary, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
                         >
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                          Add Rule
+                          Add Workflow
                         </button>
                       </div>
 
-                      {/* Rules table */}
-                      {(editLeave.workflowRules || []).length > 0 ? (
-                        <div style={{ border: `1px solid ${T.border}`, borderRadius: T.rSm, overflow: "hidden" }}>
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 72px 80px 32px", background: T.surfaceAlt, borderBottom: `1px solid ${T.border}`, padding: "6px 10px", gap: 8 }}>
-                            {["Approval Workflow", "Điều kiện", "Số ngày", ""].map((h, i) => (
-                              <div key={i} style={{ fontSize: 10, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</div>
-                            ))}
-                          </div>
-                          {(editLeave.workflowRules || []).map((rule, ri) => (
-                            <div key={ri} style={{ display: "grid", gridTemplateColumns: "1fr 72px 80px 32px", padding: "8px 10px", gap: 8, borderBottom: ri < (editLeave.workflowRules || []).length - 1 ? `1px solid ${T.borderLight}` : "none", alignItems: "center", background: ri % 2 === 0 ? "white" : T.surfaceAlt }}>
-                              <select
-                                value={rule.wfId}
-                                onChange={e => setEditLeave(p => ({ ...p, workflowRules: p.workflowRules.map((r, i) => i === ri ? { ...r, wfId: Number(e.target.value) } : r) }))}
-                                style={{ width: "100%", padding: "6px 8px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 12, fontFamily: T.fontB, color: T.ink, background: "white", boxSizing: "border-box" }}
-                              >
-                                {approvalFlows.map(fl => <option key={fl.id} value={fl.id}>{fl.type}</option>)}
-                              </select>
-                              <select
-                                value={rule.op}
-                                onChange={e => setEditLeave(p => ({ ...p, workflowRules: p.workflowRules.map((r, i) => i === ri ? { ...r, op: e.target.value } : r) }))}
-                                style={{ width: "100%", padding: "6px 8px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontM, color: T.primary, fontWeight: 700, background: T.primarySoft, boxSizing: "border-box", textAlign: "center" }}
-                              >
-                                {["<=", "<", ">=", ">", "="].map(op => <option key={op} value={op}>{op}</option>)}
-                              </select>
-                              <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                                <input
-                                  type="number" min="1"
-                                  value={rule.days}
-                                  onChange={e => setEditLeave(p => ({ ...p, workflowRules: p.workflowRules.map((r, i) => i === ri ? { ...r, days: Number(e.target.value) || 1 } : r) }))}
-                                  style={{ width: "100%", padding: "6px 6px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 12, fontFamily: T.fontB, color: T.ink, background: "white", boxSizing: "border-box", textAlign: "center" }}
-                                />
-                                <span style={{ fontSize: 10, color: T.inkMuted, whiteSpace: "nowrap" }}>ngày</span>
+                      {(editLeave.workflowRules || []).length > 0 ? (() => {
+                        const rules = editLeave.workflowRules || [];
+                        const hasMultiDefault = rules.filter(r => r.isDefault).length > 1;
+                        const nonDefault = rules.filter(r => !r.isDefault);
+                        const hasOverlap = (() => { for(let i=0;i<nonDefault.length;i++) for(let j=i+1;j<nonDefault.length;j++) if(nonDefault[i].fromDays<=nonDefault[j].toDays&&nonDefault[j].fromDays<=nonDefault[i].toDays) return true; return false; })();
+                        const hasGap = (() => { if(nonDefault.length<2) return false; const s=[...nonDefault].sort((a,b)=>a.fromDays-b.fromDays); for(let i=1;i<s.length;i++) if(s[i].fromDays>s[i-1].toDays+1) return true; return false; })();
+                        const hasFromGtTo = nonDefault.some(r => r.fromDays > r.toDays);
+                        return (
+                          <>
+                            <div style={{ border: `1px solid ${T.border}`, borderRadius: T.rSm, overflow: "hidden" }}>
+                              <div style={{ display: "grid", gridTemplateColumns: "36px 1fr 72px 72px 32px", background: T.surfaceAlt, borderBottom: `1px solid ${T.border}`, padding: "6px 10px", gap: 8, alignItems: "center" }}>
+                                {["Default","Approval Workflow","From","To",""].map((h,i)=>(
+                                  <div key={i} style={{ fontSize:10, fontWeight:700, color:T.inkMuted, textTransform:"uppercase", letterSpacing:"0.04em", textAlign:i===0?"center":"left" }}>{h}</div>
+                                ))}
                               </div>
-                              <button
-                                onClick={() => setEditLeave(p => ({ ...p, workflowRules: p.workflowRules.filter((_, i) => i !== ri) }))}
-                                style={{ width: 26, height: 26, borderRadius: T.rSm, border: "none", background: T.dangerSoft, color: T.danger, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, flexShrink: 0 }}
-                              >✕</button>
+                              {rules.map((rule, ri) => {
+                                const rowOverlap = !rule.isDefault && hasOverlap && nonDefault.some(other => other!==rule && rule.fromDays<=other.toDays && other.fromDays<=rule.toDays);
+                                const fgt = !rule.isDefault && rule.fromDays > rule.toDays;
+                                return (
+                                  <div key={ri} style={{ display:"grid", gridTemplateColumns:"36px 1fr 72px 72px 32px", padding:"8px 10px", gap:8, borderBottom:ri<rules.length-1?`1px solid ${T.borderLight}`:"none", alignItems:"center", background:rule.isDefault?`${T.primary}06`:rowOverlap?"#FFF7ED":ri%2===0?"white":T.surfaceAlt }}>
+                                    <div style={{ display:"flex", justifyContent:"center" }}>
+                                      <div onClick={() => setEditLeave(p => ({ ...p, workflowRules: p.workflowRules.map((r,i) => ({ ...r, isDefault: i===ri })) }))}
+                                        style={{ width:18, height:18, borderRadius:"50%", border:`2px solid ${rule.isDefault?T.primary:T.border}`, background:rule.isDefault?T.primary:"white", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                        {rule.isDefault && <div style={{ width:7, height:7, borderRadius:"50%", background:"white" }}/>}
+                                      </div>
+                                    </div>
+                                    <select value={rule.wfId} onChange={e => setEditLeave(p => ({ ...p, workflowRules: p.workflowRules.map((r,i) => i===ri?{...r,wfId:Number(e.target.value)}:r) }))}
+                                      style={{ width:"100%", padding:"6px 8px", borderRadius:T.rSm, border:`1px solid ${rule.isDefault?T.primary+"50":T.border}`, fontSize:12, fontFamily:T.fontB, color:T.ink, background:rule.isDefault?T.primarySoft:"white", boxSizing:"border-box" }}>
+                                      {approvalFlows.map(fl => <option key={fl.id} value={fl.id}>{fl.type}</option>)}
+                                    </select>
+                                    {rule.isDefault ? (
+                                      <div style={{ gridColumn:"span 2", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                                        <span style={{ fontSize:10, padding:"3px 10px", borderRadius:T.rFull, background:T.primarySoft, color:T.primary, fontWeight:700, border:`1px solid ${T.primary}30`, whiteSpace:"nowrap" }}>
+                                          Áp dụng khi không khớp range
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <input type="number" min="0" value={rule.fromDays} onChange={e => setEditLeave(p => ({ ...p, workflowRules: p.workflowRules.map((r,i) => i===ri?{...r,fromDays:Number(e.target.value)||0}:r) }))}
+                                          style={{ width:"100%", padding:"6px 6px", borderRadius:T.rSm, border:`1px solid ${fgt||rowOverlap?T.danger:T.border}`, fontSize:12, textAlign:"center", boxSizing:"border-box" }}/>
+                                        <input type="number" min="0" value={rule.toDays} onChange={e => setEditLeave(p => ({ ...p, workflowRules: p.workflowRules.map((r,i) => i===ri?{...r,toDays:Number(e.target.value)||0}:r) }))}
+                                          style={{ width:"100%", padding:"6px 6px", borderRadius:T.rSm, border:`1px solid ${fgt||rowOverlap?T.danger:T.border}`, fontSize:12, textAlign:"center", boxSizing:"border-box" }}/>
+                                      </>
+                                    )}
+                                    <button onClick={() => setEditLeave(p => ({ ...p, workflowRules: p.workflowRules.filter((_,i) => i!==ri) }))}
+                                      style={{ width:26, height:26, borderRadius:T.rSm, border:"none", background:T.dangerSoft, color:T.danger, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:700 }}>✕</button>
+                                  </div>
+                                );
+                              })}
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div style={{ padding: "20px", textAlign: "center", background: T.surfaceAlt, borderRadius: T.rSm, border: `1px dashed ${T.border}` }}>
-                          <div style={{ fontSize: 13, color: T.inkMuted, marginBottom: 6 }}>Chưa có rule phê duyệt nào</div>
-                          <div style={{ fontSize: 11, color: T.inkMuted }}>Nhấn <b>Add Rule</b> để thêm điều kiện</div>
-                        </div>
-                      )}
-
-                      {/* Preview */}
-                      {(editLeave.workflowRules || []).length > 0 && (
-                        <div style={{ marginTop: 10, padding: "8px 12px", background: T.infoSoft, borderRadius: T.rSm, fontSize: 11, color: T.info }}>
-                          <div style={{ fontWeight: 700, marginBottom: 4 }}>Ví dụ áp dụng:</div>
-                          {(editLeave.workflowRules || []).map((rule, ri) => {
-                            const fl = approvalFlows.find(f => f.id === rule.wfId);
-                            return (
-                              <div key={ri} style={{ marginBottom: 2 }}>
-                                • Nghỉ <b>{rule.op} {rule.days} ngày</b> → <b>{fl?.type || "—"}</b>
+                            <div style={{ marginTop:8, display:"flex", alignItems:"flex-start", gap:8, padding:"8px 11px", background:T.primarySoft, border:`1px solid ${T.primary}20`, borderRadius:T.rSm }}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.primary} strokeWidth="2.2" strokeLinecap="round" style={{ flexShrink:0, marginTop:1 }}>
+                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                              </svg>
+                              <div style={{ fontSize:11, color:T.primary, lineHeight:1.5 }}>
+                                <b>Default Workflow</b> được áp dụng khi số ngày nghỉ không khớp với bất kỳ khoảng From–To nào. Workflow Default không cần điều kiện khoảng ngày. Mỗi loại phép chỉ có 1 Default.
                               </div>
-                            );
-                          })}
+                            </div>
+                            {hasFromGtTo && <div style={{ marginTop:6, padding:"7px 11px", background:T.dangerSoft, border:`1px solid ${T.danger}20`, borderRadius:T.rSm, fontSize:12, color:T.danger }}>⚠ From Days phải nhỏ hơn hoặc bằng To Days.</div>}
+                            {hasOverlap && !hasFromGtTo && <div style={{ marginTop:6, padding:"7px 11px", background:T.dangerSoft, border:`1px solid ${T.danger}20`, borderRadius:T.rSm, fontSize:12, color:T.danger }}>⚠ Approval workflow ranges cannot overlap.</div>}
+                            {hasGap && !hasOverlap && !hasFromGtTo && <div style={{ marginTop:6, padding:"7px 11px", background:T.warningSoft, border:`1px solid ${T.warning}20`, borderRadius:T.rSm, fontSize:12, color:T.warning }}>⚠ There is a gap between ranges. Đơn không khớp sẽ dùng Default Workflow.</div>}
+                            {hasMultiDefault && <div style={{ marginTop:6, padding:"7px 11px", background:T.dangerSoft, border:`1px solid ${T.danger}20`, borderRadius:T.rSm, fontSize:12, color:T.danger }}>⚠ Chỉ được chọn 1 workflow là Default.</div>}
+                            {rules.filter(r=>r.isDefault).length===0 && <div style={{ marginTop:6, padding:"7px 11px", background:T.warningSoft, border:`1px solid ${T.warning}20`, borderRadius:T.rSm, fontSize:12, color:T.warning }}>⚠ Hãy chọn 1 workflow làm Default.</div>}
+                            {!hasOverlap && !hasFromGtTo && (
+                              <div style={{ marginTop:8, padding:"8px 12px", background:T.infoSoft, borderRadius:T.rSm, fontSize:11, color:T.info }}>
+                                <div style={{ fontWeight:700, marginBottom:4 }}>Logic áp dụng:</div>
+                                {[...nonDefault].sort((a,b)=>a.fromDays-b.fromDays).map((rule,ri)=>{ const fl=approvalFlows.find(f=>f.id===rule.wfId); return <div key={ri} style={{ marginBottom:2 }}>• Nghỉ <b>{rule.fromDays}–{rule.toDays===999?"∞":rule.toDays} ngày</b> → <b>{fl?.type||"—"}</b></div>; })}
+                                {rules.filter(r=>r.isDefault).map((rule,ri)=>{ const fl=approvalFlows.find(f=>f.id===rule.wfId); return <div key={ri} style={{ marginTop:4, paddingTop:4, borderTop:`1px dashed ${T.info}40` }}>• Tất cả trường hợp còn lại → <b>{fl?.type||"—"}</b> <span style={{ marginLeft:4, padding:"1px 6px", borderRadius:3, background:T.info, color:"white", fontSize:9, fontWeight:700 }}>Default</span></div>; })}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })() : (
+                        <div style={{ padding: "20px", textAlign: "center", background: T.surfaceAlt, borderRadius: T.rSm, border: `1px dashed ${T.border}` }}>
+                          <div style={{ fontSize: 13, color: T.inkMuted, marginBottom: 6 }}>Chưa có workflow phê duyệt nào</div>
+                          <div style={{ fontSize: 11, color: T.inkMuted }}>Nhấn <b>Add Workflow</b> để cấu hình</div>
                         </div>
                       )}
                     </div>
@@ -7615,65 +7686,89 @@ const SettingsPage = () => {
                           Approval Workflow
                         </label>
                         <button
-                          onClick={() => setCreateLeaveDraft(p => ({ ...p, workflowRules: [...(p.workflowRules || []), { wfId: approvalFlows[0]?.id || 1, op: ">=", days: 1 }] }))}
+                          onClick={() => setCreateLeaveDraft(p => ({ ...p, workflowRules: [...(p.workflowRules || []), { wfId: approvalFlows[0]?.id || 1, isDefault: (p.workflowRules||[]).length === 0, fromDays: 0, toDays: 999 }] }))}
                           style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: T.rFull, border: `1px solid ${T.primary}`, background: T.primarySoft, color: T.primary, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
                         >
                           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                          Add Rule
+                          Add Workflow
                         </button>
                       </div>
-                      {(createLeaveDraft.workflowRules || []).length > 0 ? (
-                        <div style={{ border: `1px solid ${T.border}`, borderRadius: T.rSm, overflow: "hidden" }}>
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 72px 80px 32px", background: T.surfaceAlt, borderBottom: `1px solid ${T.border}`, padding: "6px 10px", gap: 8 }}>
-                            {["Approval Workflow", "Điều kiện", "Số ngày", ""].map((h, i) => (
-                              <div key={i} style={{ fontSize: 10, fontWeight: 700, color: T.inkMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>{h}</div>
-                            ))}
-                          </div>
-                          {(createLeaveDraft.workflowRules || []).map((rule, ri) => (
-                            <div key={ri} style={{ display: "grid", gridTemplateColumns: "1fr 72px 80px 32px", padding: "8px 10px", gap: 8, borderBottom: ri < (createLeaveDraft.workflowRules || []).length - 1 ? `1px solid ${T.borderLight}` : "none", alignItems: "center", background: ri % 2 === 0 ? "white" : T.surfaceAlt }}>
-                              <select
-                                value={rule.wfId}
-                                onChange={e => setCreateLeaveDraft(p => ({ ...p, workflowRules: p.workflowRules.map((r, i) => i === ri ? { ...r, wfId: Number(e.target.value) } : r) }))}
-                                style={{ width: "100%", padding: "6px 8px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 12, fontFamily: T.fontB, color: T.ink, background: "white", boxSizing: "border-box" }}
-                              >
-                                {approvalFlows.map(fl => <option key={fl.id} value={fl.id}>{fl.type}</option>)}
-                              </select>
-                              <select
-                                value={rule.op}
-                                onChange={e => setCreateLeaveDraft(p => ({ ...p, workflowRules: p.workflowRules.map((r, i) => i === ri ? { ...r, op: e.target.value } : r) }))}
-                                style={{ width: "100%", padding: "6px 8px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 13, fontFamily: T.fontM, color: T.primary, fontWeight: 700, background: T.primarySoft, boxSizing: "border-box", textAlign: "center" }}
-                              >
-                                {["<=", "<", ">=", ">", "="].map(op => <option key={op} value={op}>{op}</option>)}
-                              </select>
-                              <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                                <input
-                                  type="number" min="1"
-                                  value={rule.days}
-                                  onChange={e => setCreateLeaveDraft(p => ({ ...p, workflowRules: p.workflowRules.map((r, i) => i === ri ? { ...r, days: Number(e.target.value) || 1 } : r) }))}
-                                  style={{ width: "100%", padding: "6px 6px", borderRadius: T.rSm, border: `1px solid ${T.border}`, fontSize: 12, fontFamily: T.fontB, color: T.ink, background: "white", boxSizing: "border-box", textAlign: "center" }}
-                                />
-                                <span style={{ fontSize: 10, color: T.inkMuted, whiteSpace: "nowrap" }}>ngày</span>
+                      {(createLeaveDraft.workflowRules || []).length > 0 ? (() => {
+                        const rules = createLeaveDraft.workflowRules || [];
+                        const hasMultiDefault = rules.filter(r => r.isDefault).length > 1;
+                        const nonDefault = rules.filter(r => !r.isDefault);
+                        const hasOverlap = (() => { for(let i=0;i<nonDefault.length;i++) for(let j=i+1;j<nonDefault.length;j++) if(nonDefault[i].fromDays<=nonDefault[j].toDays&&nonDefault[j].fromDays<=nonDefault[i].toDays) return true; return false; })();
+                        const hasGap = (() => { if(nonDefault.length<2) return false; const s=[...nonDefault].sort((a,b)=>a.fromDays-b.fromDays); for(let i=1;i<s.length;i++) if(s[i].fromDays>s[i-1].toDays+1) return true; return false; })();
+                        const hasFromGtTo = nonDefault.some(r => r.fromDays > r.toDays);
+                        return (
+                          <>
+                            <div style={{ border:`1px solid ${T.border}`, borderRadius:T.rSm, overflow:"hidden" }}>
+                              <div style={{ display:"grid", gridTemplateColumns:"36px 1fr 72px 72px 32px", background:T.surfaceAlt, borderBottom:`1px solid ${T.border}`, padding:"6px 10px", gap:8, alignItems:"center" }}>
+                                {["Default","Approval Workflow","From","To",""].map((h,i)=>(
+                                  <div key={i} style={{ fontSize:10, fontWeight:700, color:T.inkMuted, textTransform:"uppercase", letterSpacing:"0.04em", textAlign:i===0?"center":"left" }}>{h}</div>
+                                ))}
                               </div>
-                              <button
-                                onClick={() => setCreateLeaveDraft(p => ({ ...p, workflowRules: p.workflowRules.filter((_, i) => i !== ri) }))}
-                                style={{ width: 26, height: 26, borderRadius: T.rSm, border: "none", background: T.dangerSoft, color: T.danger, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, flexShrink: 0 }}
-                              >✕</button>
+                              {rules.map((rule, ri) => {
+                                const rowOverlap = !rule.isDefault && hasOverlap && nonDefault.some(other => other!==rule && rule.fromDays<=other.toDays && other.fromDays<=rule.toDays);
+                                const fgt = !rule.isDefault && rule.fromDays > rule.toDays;
+                                return (
+                                  <div key={ri} style={{ display:"grid", gridTemplateColumns:"36px 1fr 72px 72px 32px", padding:"8px 10px", gap:8, borderBottom:ri<rules.length-1?`1px solid ${T.borderLight}`:"none", alignItems:"center", background:rule.isDefault?`${T.primary}06`:rowOverlap?"#FFF7ED":ri%2===0?"white":T.surfaceAlt }}>
+                                    <div style={{ display:"flex", justifyContent:"center" }}>
+                                      <div onClick={() => setCreateLeaveDraft(p => ({ ...p, workflowRules: p.workflowRules.map((r,i) => ({ ...r, isDefault: i===ri })) }))}
+                                        style={{ width:18, height:18, borderRadius:"50%", border:`2px solid ${rule.isDefault?T.primary:T.border}`, background:rule.isDefault?T.primary:"white", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                                        {rule.isDefault && <div style={{ width:7, height:7, borderRadius:"50%", background:"white" }}/>}
+                                      </div>
+                                    </div>
+                                    <select value={rule.wfId} onChange={e => setCreateLeaveDraft(p => ({ ...p, workflowRules: p.workflowRules.map((r,i) => i===ri?{...r,wfId:Number(e.target.value)}:r) }))}
+                                      style={{ width:"100%", padding:"6px 8px", borderRadius:T.rSm, border:`1px solid ${rule.isDefault?T.primary+"50":T.border}`, fontSize:12, fontFamily:T.fontB, color:T.ink, background:rule.isDefault?T.primarySoft:"white", boxSizing:"border-box" }}>
+                                      {approvalFlows.map(fl => <option key={fl.id} value={fl.id}>{fl.type}</option>)}
+                                    </select>
+                                    {rule.isDefault ? (
+                                      <div style={{ gridColumn:"span 2", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                                        <span style={{ fontSize:10, padding:"3px 10px", borderRadius:T.rFull, background:T.primarySoft, color:T.primary, fontWeight:700, border:`1px solid ${T.primary}30`, whiteSpace:"nowrap" }}>
+                                          Áp dụng khi không khớp range
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <input type="number" min="0" value={rule.fromDays} onChange={e => setCreateLeaveDraft(p => ({ ...p, workflowRules: p.workflowRules.map((r,i) => i===ri?{...r,fromDays:Number(e.target.value)||0}:r) }))}
+                                          style={{ width:"100%", padding:"6px 6px", borderRadius:T.rSm, border:`1px solid ${fgt||rowOverlap?T.danger:T.border}`, fontSize:12, textAlign:"center", boxSizing:"border-box" }}/>
+                                        <input type="number" min="0" value={rule.toDays} onChange={e => setCreateLeaveDraft(p => ({ ...p, workflowRules: p.workflowRules.map((r,i) => i===ri?{...r,toDays:Number(e.target.value)||0}:r) }))}
+                                          style={{ width:"100%", padding:"6px 6px", borderRadius:T.rSm, border:`1px solid ${fgt||rowOverlap?T.danger:T.border}`, fontSize:12, textAlign:"center", boxSizing:"border-box" }}/>
+                                      </>
+                                    )}
+                                    <button onClick={() => setCreateLeaveDraft(p => ({ ...p, workflowRules: p.workflowRules.filter((_,i) => i!==ri) }))}
+                                      style={{ width:26, height:26, borderRadius:T.rSm, border:"none", background:T.dangerSoft, color:T.danger, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:700 }}>✕</button>
+                                  </div>
+                                );
+                              })}
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div style={{ padding: "20px", textAlign: "center", background: T.surfaceAlt, borderRadius: T.rSm, border: `1px dashed ${T.border}` }}>
-                          <div style={{ fontSize: 13, color: T.inkMuted, marginBottom: 6 }}>Chưa có rule phê duyệt nào</div>
-                          <div style={{ fontSize: 11, color: T.inkMuted }}>Nhấn <b>Add Rule</b> để thêm điều kiện</div>
-                        </div>
-                      )}
-                      {(createLeaveDraft.workflowRules || []).length > 0 && (
-                        <div style={{ marginTop: 10, padding: "8px 12px", background: T.infoSoft, borderRadius: T.rSm, fontSize: 11, color: T.info }}>
-                          <div style={{ fontWeight: 700, marginBottom: 4 }}>Ví dụ áp dụng:</div>
-                          {(createLeaveDraft.workflowRules || []).map((rule, ri) => {
-                            const fl = approvalFlows.find(f => f.id === rule.wfId);
-                            return <div key={ri} style={{ marginBottom: 2 }}>• Nghỉ <b>{rule.op} {rule.days} ngày</b> → <b>{fl?.type || "—"}</b></div>;
-                          })}
+                            <div style={{ marginTop:8, display:"flex", alignItems:"flex-start", gap:8, padding:"8px 11px", background:T.primarySoft, border:`1px solid ${T.primary}20`, borderRadius:T.rSm }}>
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={T.primary} strokeWidth="2.2" strokeLinecap="round" style={{ flexShrink:0, marginTop:1 }}>
+                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                              </svg>
+                              <div style={{ fontSize:11, color:T.primary, lineHeight:1.5 }}>
+                                <b>Default Workflow</b> được áp dụng khi số ngày nghỉ không khớp với bất kỳ khoảng From–To nào. Workflow Default không cần điều kiện khoảng ngày. Mỗi loại phép chỉ có 1 Default.
+                              </div>
+                            </div>
+                            {hasFromGtTo && <div style={{ marginTop:6, padding:"7px 11px", background:T.dangerSoft, border:`1px solid ${T.danger}20`, borderRadius:T.rSm, fontSize:12, color:T.danger }}>⚠ From Days phải nhỏ hơn hoặc bằng To Days.</div>}
+                            {hasOverlap && !hasFromGtTo && <div style={{ marginTop:6, padding:"7px 11px", background:T.dangerSoft, border:`1px solid ${T.danger}20`, borderRadius:T.rSm, fontSize:12, color:T.danger }}>⚠ Approval workflow ranges cannot overlap.</div>}
+                            {hasGap && !hasOverlap && !hasFromGtTo && <div style={{ marginTop:6, padding:"7px 11px", background:T.warningSoft, border:`1px solid ${T.warning}20`, borderRadius:T.rSm, fontSize:12, color:T.warning }}>⚠ There is a gap between ranges. Đơn không khớp sẽ dùng Default Workflow.</div>}
+                            {hasMultiDefault && <div style={{ marginTop:6, padding:"7px 11px", background:T.dangerSoft, border:`1px solid ${T.danger}20`, borderRadius:T.rSm, fontSize:12, color:T.danger }}>⚠ Chỉ được chọn 1 workflow là Default.</div>}
+                            {rules.filter(r=>r.isDefault).length===0 && <div style={{ marginTop:6, padding:"7px 11px", background:T.warningSoft, border:`1px solid ${T.warning}20`, borderRadius:T.rSm, fontSize:12, color:T.warning }}>⚠ Hãy chọn 1 workflow làm Default.</div>}
+                            {!hasOverlap && !hasFromGtTo && (
+                              <div style={{ marginTop:8, padding:"8px 12px", background:T.infoSoft, borderRadius:T.rSm, fontSize:11, color:T.info }}>
+                                <div style={{ fontWeight:700, marginBottom:4 }}>Logic áp dụng:</div>
+                                {[...nonDefault].sort((a,b)=>a.fromDays-b.fromDays).map((rule,ri)=>{ const fl=approvalFlows.find(f=>f.id===rule.wfId); return <div key={ri} style={{ marginBottom:2 }}>• Nghỉ <b>{rule.fromDays}–{rule.toDays===999?"∞":rule.toDays} ngày</b> → <b>{fl?.type||"—"}</b></div>; })}
+                                {rules.filter(r=>r.isDefault).map((rule,ri)=>{ const fl=approvalFlows.find(f=>f.id===rule.wfId); return <div key={ri} style={{ marginTop:4, paddingTop:4, borderTop:`1px dashed ${T.info}40` }}>• Tất cả trường hợp còn lại → <b>{fl?.type||"—"}</b> <span style={{ marginLeft:4, padding:"1px 6px", borderRadius:3, background:T.info, color:"white", fontSize:9, fontWeight:700 }}>Default</span></div>; })}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })() : (
+                        <div style={{ padding:"20px", textAlign:"center", background:T.surfaceAlt, borderRadius:T.rSm, border:`1px dashed ${T.border}` }}>
+                          <div style={{ fontSize:13, color:T.inkMuted, marginBottom:6 }}>Chưa có workflow phê duyệt nào</div>
+                          <div style={{ fontSize:11, color:T.inkMuted }}>Nhấn <b>Add Workflow</b> để cấu hình</div>
                         </div>
                       )}
                     </div>
