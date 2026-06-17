@@ -8851,16 +8851,15 @@ const WorkSchedulePage = () => {
 
   // ── Swap modal ────────────────────────────────────────────────
   const [swapModal, setSwapModal] = useState(null);
-  const [swapForm,  setSwapForm]  = useState({ adjustType:"change", pairs:[], newDays:[], reason:"" });
-  // adjustType: "change" = swap existing R days | "add" = add new R days
+  const [swapForm,  setSwapForm]  = useState({ pairs:[], newDays:[], reason:"" });
 
   const confirmSwap = () => {
-    const validPairs  = swapForm.pairs.filter(p => p.fromIdx !== null && p.toDate);
+    const validPairs   = swapForm.pairs.filter(p => p.fromIdx !== null && p.toDate);
     const validNewDays = swapForm.newDays.filter(Boolean);
     if (validPairs.length === 0 && validNewDays.length === 0) return;
     setEmps(prev => prev.map(e => e.id!==swapModal.id ? e : { ...e, status:"pending_swap",
-      pendingSwap:{ adjustType: swapForm.adjustType, pairs: validPairs, newDays: validNewDays, reason:swapForm.reason, requestedAt:"Vừa xong" } }));
-    setSwapModal(null); setSwapForm({ adjustType:"change", pairs:[], newDays:[], reason:"" });
+      pendingSwap:{ pairs: validPairs, newDays: validNewDays, reason:swapForm.reason, requestedAt:"Vừa xong" } }));
+    setSwapModal(null); setSwapForm({ pairs:[], newDays:[], reason:"" });
   };
 
   const applyWeekR = (empId, ws) =>
@@ -9183,7 +9182,7 @@ const WorkSchedulePage = () => {
                             </div>
                           )}
                           {emp.status==="approved"&&(
-                            <button onClick={()=>{setSwapModal(emp);setSwapForm({adjustType:"change",pairs:[],newDays:[],reason:""}); }}
+                            <button onClick={()=>{setSwapModal(emp);setSwapForm({pairs:[],newDays:[],reason:""}); }}
                               style={{display:"flex",alignItems:"center",gap:5,padding:"6px 10px",borderRadius:T.rSm,border:"1px solid #7C3AED",background:"#EDE9FE",color:"#7C3AED",fontSize:11,fontWeight:700,cursor:"pointer",width:"100%",justifyContent:"center"}}>
                               🔄 Đổi ngày Remote
                             </button>
@@ -9284,55 +9283,44 @@ const WorkSchedulePage = () => {
       {/* ── Swap Modal ── */}
       {swapModal && (() => {
         const remoteDays = days.map((d,i) => {
-          const dw = d.getDay();
-          if (dw===0||dw===6||swapModal.schedule?.[i]!=="R") return null;
+          if (d.getDay()===0||d.getDay()===6||swapModal.schedule?.[i]!=="R") return null;
           return { i, d };
         }).filter(Boolean);
 
         const officeDays = days.map((d,i) => {
-          const dw = d.getDay();
-          if (dw===0||dw===6) return null;
-          const val = swapModal.schedule?.[i];
-          if (val==="R") return null; // already remote
+          if (d.getDay()===0||d.getDay()===6) return null;
+          if (swapModal.schedule?.[i]==="R") return null;
           return { i, d };
         }).filter(Boolean);
 
         const fmtD = (d) => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
-        const fmtFull = (d) => `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
 
-        // Change mode
+        // Change section
         const selectedIdxs = new Set(swapForm.pairs.map(p => p.fromIdx));
-        const toggleSelect = (idx) => {
-          if (selectedIdxs.has(idx)) {
-            setSwapForm(p => ({ ...p, pairs: p.pairs.filter(pp => pp.fromIdx !== idx) }));
-          } else {
-            setSwapForm(p => ({ ...p, pairs: [...p.pairs, { fromIdx: idx, toDate:"" }] }));
-          }
-        };
-        const updateToDate = (fromIdx, toDate) =>
+        const toggleSelect  = (idx) => setSwapForm(p => ({
+          ...p, pairs: selectedIdxs.has(idx)
+            ? p.pairs.filter(pp => pp.fromIdx !== idx)
+            : [...p.pairs, { fromIdx: idx, toDate:"" }]
+        }));
+        const updateToDate  = (fromIdx, toDate) =>
           setSwapForm(p => ({ ...p, pairs: p.pairs.map(pp => pp.fromIdx===fromIdx ? {...pp,toDate} : pp) }));
 
-        // Add mode
-        const toggleNewDay = (idx) => {
+        // Add section
+        const toggleNewDay  = (idx) => {
           const ds = days[idx].toISOString().slice(0,10);
-          setSwapForm(p => ({
-            ...p,
-            newDays: p.newDays.includes(ds) ? p.newDays.filter(d=>d!==ds) : [...p.newDays, ds]
-          }));
+          setSwapForm(p => ({ ...p, newDays: p.newDays.includes(ds) ? p.newDays.filter(d=>d!==ds) : [...p.newDays, ds] }));
         };
 
         // Validation
-        const existingR  = new Set(remoteDays.map(({d}) => d.toISOString().slice(0,10)));
-        const allToDates = swapForm.pairs.map(p => p.toDate).filter(Boolean);
-        const hasDupTo   = allToDates.length !== new Set(allToDates).size;
-        const allFilled  = swapForm.pairs.every(p => p.toDate);
+        const existingR       = new Set(remoteDays.map(({d}) => d.toISOString().slice(0,10)));
+        const allToDates      = swapForm.pairs.map(p=>p.toDate).filter(Boolean);
+        const hasDupTo        = allToDates.length !== new Set(allToDates).size;
+        const allPairsFilled  = swapForm.pairs.length > 0 && swapForm.pairs.every(p => p.toDate);
         const newDateConflict = swapForm.pairs.some(p => existingR.has(p.toDate));
-        const canSubmitChange = swapForm.pairs.length > 0 && allFilled && !hasDupTo && !newDateConflict;
-        const canSubmitAdd    = swapForm.newDays.length > 0;
-        const canSubmit = (canSubmitChange || canSubmitAdd) && swapForm.reason.trim();
+        const hasAnything     = (swapForm.pairs.length > 0 && allPairsFilled && !hasDupTo && !newDateConflict) || swapForm.newDays.length > 0;
+        const canSubmit       = hasAnything && swapForm.reason.trim();
 
-        const isChange = swapForm.adjustType === "change";
-        const isAdd    = swapForm.adjustType === "add";
+        const totalChanges    = swapForm.pairs.filter(p=>p.toDate).length + swapForm.newDays.length;
 
         return (
           <Modal title="📋 Work Schedule Adjustment Request" onClose={()=>setSwapModal(null)} width={580}>
@@ -9348,194 +9336,158 @@ const WorkSchedulePage = () => {
                 <Badge color={T.success} bg={T.successSoft} dot style={{marginLeft:"auto"}}>Đã duyệt</Badge>
               </div>
 
-              {/* Adjustment Type selector */}
-              <div>
-                <label style={{display:"block",fontSize:12,fontWeight:700,color:T.inkSoft,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8}}>Loại điều chỉnh *</label>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-                  {[
-                    { v:"change", icon:"🔄", label:"Change Existing Remote",  desc:"Đổi ngày Remote cũ → ngày Remote mới" },
-                    { v:"add",    icon:"➕", label:"Add New Remote Day",       desc:"Bổ sung ngày Remote chưa có trong lịch" },
-                  ].map(opt => {
-                    const isSel = swapForm.adjustType === opt.v;
-                    return (
-                      <div key={opt.v} onClick={() => setSwapForm(p => ({ ...p, adjustType: opt.v, pairs:[], newDays:[] }))}
-                        style={{display:"flex",alignItems:"center",gap:10,padding:"11px 13px",borderRadius:T.r,cursor:"pointer",border:`2px solid ${isSel?"#7C3AED":T.border}`,background:isSel?"#F5F3FF":T.surface,transition:"all 0.12s"}}>
-                        <span style={{fontSize:20,flexShrink:0}}>{opt.icon}</span>
-                        <div>
-                          <div style={{fontSize:12,fontWeight:700,color:isSel?"#7C3AED":T.ink}}>{opt.label}</div>
-                          <div style={{fontSize:10,color:T.inkMuted,marginTop:2}}>{opt.desc}</div>
-                        </div>
-                        {isSel && <div style={{marginLeft:"auto",width:16,height:16,borderRadius:"50%",background:"#7C3AED",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                          <div style={{width:6,height:6,borderRadius:"50%",background:"white"}}/>
-                        </div>}
-                      </div>
-                    );
-                  })}
-                </div>
+              <div style={{padding:"8px 12px",background:"#EDE9FE",border:"1px solid #7C3AED20",borderRadius:T.rSm,fontSize:12,color:"#5B21B6"}}>
+                ℹ Có thể thực hiện cùng lúc: đổi ngày Remote cũ và/hoặc đăng ký thêm ngày Remote mới trong cùng một yêu cầu.
               </div>
 
-              {/* ── MODE: Change Existing ── */}
-              {isChange && (
-                <div style={{display:"flex",flexDirection:"column",gap:12}}>
-                  {/* Step 1: Select days */}
-                  <div>
-                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                      <label style={{fontSize:12,fontWeight:700,color:T.inkSoft,textTransform:"uppercase",letterSpacing:"0.05em"}}>
-                        1. Chọn ngày Remote cần đổi
-                      </label>
-                      {remoteDays.length > 0 && (
-                        <button onClick={() => setSwapForm(p => ({
-                          ...p, pairs: selectedIdxs.size===remoteDays.length ? [] : remoteDays.map(({i}) => ({ fromIdx:i, toDate:"" }))
-                        }))} style={{fontSize:11,color:T.primary,background:"none",border:"none",cursor:"pointer",fontWeight:600}}>
-                          {selectedIdxs.size===remoteDays.length?"Bỏ chọn tất cả":"Chọn tất cả"}
-                        </button>
-                      )}
+              {/* ── Section A: Change existing R days ── */}
+              <div style={{border:`1px solid ${T.border}`,borderRadius:T.r,overflow:"hidden"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`}}>
+                  <span style={{fontSize:16}}>🔄</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:12,fontWeight:700,color:T.ink}}>Đổi ngày Remote hiện có</div>
+                    <div style={{fontSize:11,color:T.inkMuted}}>Chọn ngày R muốn đổi → điền ngày mới</div>
+                  </div>
+                  {swapForm.pairs.length > 0 && (
+                    <span style={{fontSize:11,padding:"2px 8px",borderRadius:T.rFull,background:"#FFFBEB",border:"1px solid #FDE68A",color:"#92400E",fontWeight:700}}>{swapForm.pairs.length} ngày</span>
+                  )}
+                </div>
+
+                <div style={{padding:"12px 14px",display:"flex",flexDirection:"column",gap:10}}>
+                  {/* Select existing R days */}
+                  {remoteDays.length === 0 ? (
+                    <div style={{padding:"12px",textAlign:"center",fontSize:12,color:T.inkMuted,background:T.surfaceAlt,borderRadius:T.rSm}}>
+                      Không có ngày Remote nào trong tháng này
                     </div>
+                  ) : (
                     <div style={{border:`1px solid ${T.border}`,borderRadius:T.rSm,overflow:"hidden"}}>
-                      <div style={{display:"grid",gridTemplateColumns:"36px 1fr",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,padding:"7px 12px",gap:10}}>
-                        <div style={{fontSize:10,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.04em"}}>✓</div>
-                        <div style={{fontSize:10,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Current Approved Remote Date</div>
+                      <div style={{display:"grid",gridTemplateColumns:"28px 1fr",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,padding:"6px 10px",gap:8}}>
+                        <div style={{fontSize:9,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.04em",textAlign:"center"}}>✓</div>
+                        <div style={{fontSize:9,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.04em"}}>Ngày Remote hiện tại</div>
                       </div>
-                      {remoteDays.length === 0 ? (
-                        <div style={{padding:"16px",textAlign:"center",fontSize:12,color:T.inkMuted}}>Không có ngày Remote nào trong tháng này</div>
-                      ) : remoteDays.map(({i,d},ri) => {
+                      {remoteDays.map(({i,d},ri) => {
                         const isSel = selectedIdxs.has(i);
                         return (
-                          <div key={i} onClick={() => toggleSelect(i)}
-                            style={{display:"grid",gridTemplateColumns:"36px 1fr",padding:"9px 12px",gap:10,borderBottom:ri<remoteDays.length-1?`1px solid ${T.borderLight}`:"none",alignItems:"center",cursor:"pointer",background:isSel?"#FFFBEB":"white",transition:"background 0.1s"}}>
-                            <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${isSel?"#F59E0B":T.border}`,background:isSel?"#F59E0B":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                              {isSel && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                          <div key={i} onClick={()=>toggleSelect(i)}
+                            style={{display:"grid",gridTemplateColumns:"28px 1fr",padding:"7px 10px",gap:8,borderBottom:ri<remoteDays.length-1?`1px solid ${T.borderLight}`:"none",alignItems:"center",cursor:"pointer",background:isSel?"#FFFBEB":"white",transition:"background 0.1s"}}>
+                            <div style={{width:16,height:16,borderRadius:3,border:`2px solid ${isSel?"#F59E0B":T.border}`,background:isSel?"#F59E0B":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                              {isSel && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
                             </div>
-                            <div style={{display:"flex",alignItems:"center",gap:8}}>
-                              <span style={{padding:"3px 10px",borderRadius:T.rSm,background:"#FFFBEB",border:"1px solid #FDE68A",fontSize:12,fontWeight:700,color:"#92400E",fontFamily:T.fontM}}>R</span>
-                              <span style={{fontSize:13,fontWeight:600,color:isSel?"#92400E":T.ink}}>{fmtD(d)} — {d.toLocaleDateString("vi-VN",{weekday:"short"})}</span>
+                            <div style={{display:"flex",alignItems:"center",gap:7}}>
+                              <span style={{padding:"2px 8px",borderRadius:T.rSm,background:"#FFFBEB",border:"1px solid #FDE68A",fontSize:11,fontWeight:700,color:"#92400E",fontFamily:T.fontM}}>R</span>
+                              <span style={{fontSize:12,fontWeight:600,color:isSel?"#92400E":T.ink}}>{fmtD(d)} — {d.toLocaleDateString("vi-VN",{weekday:"short"})}</span>
                             </div>
                           </div>
                         );
                       })}
                     </div>
-                  </div>
-
-                  {/* Step 2: Mapping */}
-                  {swapForm.pairs.length > 0 && (
-                    <div>
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                        <label style={{fontSize:12,fontWeight:700,color:T.inkSoft,textTransform:"uppercase",letterSpacing:"0.05em"}}>2. Nhập ngày Remote mới</label>
-                        <span style={{fontSize:11,color:T.inkMuted}}>{swapForm.pairs.filter(p=>p.toDate).length}/{swapForm.pairs.length} đã điền</span>
-                      </div>
-                      <div style={{border:`1px solid ${T.border}`,borderRadius:T.rSm,overflow:"hidden"}}>
-                        <div style={{display:"grid",gridTemplateColumns:"1fr 24px 1fr",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,padding:"7px 14px",gap:8}}>
-                          {["Original Date","","New Remote Date"].map((h,i)=>(
-                            <div key={i} style={{fontSize:10,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.04em",textAlign:i===1?"center":"left"}}>{h}</div>
-                          ))}
-                        </div>
-                        {swapForm.pairs.map((pair, pi) => {
-                          const origDay = days[pair.fromIdx];
-                          const toErr = pair.toDate && existingR.has(pair.toDate);
-                          const dupErr = pair.toDate && swapForm.pairs.filter(pp=>pp.toDate===pair.toDate).length>1;
-                          return (
-                            <div key={pair.fromIdx} style={{display:"grid",gridTemplateColumns:"1fr 24px 1fr",padding:"10px 14px",gap:8,borderBottom:pi<swapForm.pairs.length-1?`1px solid ${T.borderLight}`:"none",alignItems:"center",background:pi%2===0?"white":T.surfaceAlt}}>
-                              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                                <span style={{padding:"4px 10px",borderRadius:T.rSm,background:"#FFFBEB",border:"1px solid #FDE68A",fontSize:12,fontWeight:700,color:"#92400E",fontFamily:T.fontM}}>R</span>
-                                <span style={{fontSize:13,fontWeight:600,color:"#92400E"}}>{fmtD(origDay)}</span>
-                              </div>
-                              <div style={{textAlign:"center",color:T.inkMuted,fontSize:16}}>→</div>
-                              <div>
-                                <input type="date" value={pair.toDate} onChange={e=>updateToDate(pair.fromIdx,e.target.value)}
-                                  style={{width:"100%",padding:"7px 10px",borderRadius:T.rSm,border:`1.5px solid ${toErr||dupErr?T.danger:pair.toDate?"#7C3AED":T.border}`,fontSize:12,fontFamily:T.fontB,boxSizing:"border-box",outline:"none",background:pair.toDate?"#F5F3FF":"white"}} />
-                                {toErr && <div style={{fontSize:10,color:T.danger,marginTop:2}}>⚠ Ngày này đã là Remote</div>}
-                                {dupErr && <div style={{fontSize:10,color:T.danger,marginTop:2}}>⚠ Ngày trùng với dòng khác</div>}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {hasDupTo && <div style={{marginTop:8,padding:"8px 12px",background:T.dangerSoft,border:`1px solid ${T.danger}20`,borderRadius:T.rSm,fontSize:12,color:T.danger}}>⚠ Có nhiều dòng chọn cùng ngày mới.</div>}
-                      {newDateConflict && !hasDupTo && <div style={{marginTop:8,padding:"8px 12px",background:T.dangerSoft,border:`1px solid ${T.danger}20`,borderRadius:T.rSm,fontSize:12,color:T.danger}}>⚠ Ngày mới không được là ngày đã có Remote.</div>}
-                    </div>
                   )}
-                </div>
-              )}
 
-              {/* ── MODE: Add New Remote ── */}
-              {isAdd && (
-                <div>
-                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
-                    <label style={{fontSize:12,fontWeight:700,color:T.inkSoft,textTransform:"uppercase",letterSpacing:"0.05em"}}>
-                      Chọn ngày muốn làm Remote
-                    </label>
-                    <span style={{fontSize:11,color:T.inkMuted}}>Đã chọn: {swapForm.newDays.length} ngày</span>
-                  </div>
-                  <div style={{border:`1px solid ${T.border}`,borderRadius:T.rSm,overflow:"hidden",maxHeight:240,overflowY:"auto"}}>
-                    <div style={{display:"grid",gridTemplateColumns:"36px 1fr 60px",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,padding:"7px 12px",gap:10}}>
-                      {["✓","Ngày làm việc","Lịch hiện tại"].map((h,i)=>(
-                        <div key={i} style={{fontSize:10,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.04em"}}>{h}</div>
-                      ))}
-                    </div>
-                    {officeDays.length === 0 ? (
-                      <div style={{padding:"16px",textAlign:"center",fontSize:12,color:T.inkMuted}}>Không có ngày Office nào trong tháng này</div>
-                    ) : officeDays.map(({i,d},ri) => {
-                      const ds = d.toISOString().slice(0,10);
-                      const isSel = swapForm.newDays.includes(ds);
-                      const curVal = swapModal.schedule?.[i] || "O";
-                      return (
-                        <div key={i} onClick={() => toggleNewDay(i)}
-                          style={{display:"grid",gridTemplateColumns:"36px 1fr 60px",padding:"8px 12px",gap:10,borderBottom:ri<officeDays.length-1?`1px solid ${T.borderLight}`:"none",alignItems:"center",cursor:"pointer",background:isSel?T.successSoft:"white",transition:"background 0.1s"}}>
-                          <div style={{width:18,height:18,borderRadius:4,border:`2px solid ${isSel?T.success:T.border}`,background:isSel?T.success:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                            {isSel && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                          </div>
-                          <span style={{fontSize:13,fontWeight:600,color:isSel?T.success:T.ink}}>{fmtD(d)} — {d.toLocaleDateString("vi-VN",{weekday:"short"})}</span>
-                          <span style={{padding:"3px 8px",borderRadius:T.rSm,background:T.surfaceAlt,border:`1px solid ${T.border}`,fontSize:11,fontWeight:700,color:T.inkMuted,textAlign:"center",fontFamily:T.fontM}}>{curVal||"O"}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {swapForm.newDays.length > 0 && (
-                    <div style={{marginTop:8,padding:"8px 12px",background:T.successSoft,border:`1px solid ${T.success}30`,borderRadius:T.rSm,fontSize:11}}>
-                      <div style={{fontWeight:700,color:T.success,marginBottom:4}}>➕ Các ngày sẽ được đổi sang Remote:</div>
-                      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                        {swapForm.newDays.map(ds => (
-                          <span key={ds} style={{padding:"3px 9px",borderRadius:T.rFull,background:"white",border:`1px solid ${T.success}40`,fontSize:11,fontWeight:700,color:T.success,fontFamily:T.fontM}}>
-                            R · {ds.slice(8)}/{ds.slice(5,7)}
-                          </span>
+                  {/* Mapping table */}
+                  {swapForm.pairs.length > 0 && (
+                    <div style={{border:`1px solid ${T.border}`,borderRadius:T.rSm,overflow:"hidden"}}>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 20px 1fr",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,padding:"6px 12px",gap:8}}>
+                        {["Ngày cũ","","Ngày mới"].map((h,i)=>(
+                          <div key={i} style={{fontSize:9,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.04em",textAlign:i===1?"center":"left"}}>{h}</div>
                         ))}
                       </div>
+                      {swapForm.pairs.map((pair, pi) => {
+                        const origDay = days[pair.fromIdx];
+                        const toErr = pair.toDate && existingR.has(pair.toDate);
+                        const dupErr = pair.toDate && swapForm.pairs.filter(pp=>pp.toDate===pair.toDate).length>1;
+                        return (
+                          <div key={pair.fromIdx} style={{display:"grid",gridTemplateColumns:"1fr 20px 1fr",padding:"8px 12px",gap:8,borderBottom:pi<swapForm.pairs.length-1?`1px solid ${T.borderLight}`:"none",alignItems:"center",background:pi%2===0?"white":T.surfaceAlt}}>
+                            <div style={{display:"flex",alignItems:"center",gap:7}}>
+                              <span style={{padding:"3px 8px",borderRadius:T.rSm,background:"#FFFBEB",border:"1px solid #FDE68A",fontSize:11,fontWeight:700,color:"#92400E",fontFamily:T.fontM}}>R</span>
+                              <span style={{fontSize:12,fontWeight:600,color:"#92400E"}}>{fmtD(origDay)}</span>
+                            </div>
+                            <div style={{textAlign:"center",color:T.inkMuted,fontSize:14}}>→</div>
+                            <div>
+                              <input type="date" value={pair.toDate} onChange={e=>updateToDate(pair.fromIdx,e.target.value)}
+                                style={{width:"100%",padding:"6px 8px",borderRadius:T.rSm,border:`1.5px solid ${toErr||dupErr?T.danger:pair.toDate?"#7C3AED":T.border}`,fontSize:12,fontFamily:T.fontB,boxSizing:"border-box",outline:"none",background:pair.toDate?"#F5F3FF":"white"}} />
+                              {toErr && <div style={{fontSize:9,color:T.danger,marginTop:2}}>⚠ Ngày này đã là Remote</div>}
+                              {dupErr && <div style={{fontSize:9,color:T.danger,marginTop:2}}>⚠ Trùng ngày</div>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {hasDupTo && <div style={{padding:"7px 10px",background:T.dangerSoft,border:`1px solid ${T.danger}20`,borderRadius:T.rSm,fontSize:11,color:T.danger}}>⚠ Có nhiều dòng chọn cùng ngày mới.</div>}
+                  {newDateConflict && !hasDupTo && <div style={{padding:"7px 10px",background:T.dangerSoft,border:`1px solid ${T.danger}20`,borderRadius:T.rSm,fontSize:11,color:T.danger}}>⚠ Ngày mới không được là ngày đã có Remote.</div>}
+                </div>
+              </div>
+
+              {/* ── Section B: Add new R days ── */}
+              <div style={{border:`1px solid ${T.border}`,borderRadius:T.r,overflow:"hidden"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,padding:"10px 14px",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`}}>
+                  <span style={{fontSize:16}}>➕</span>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:12,fontWeight:700,color:T.ink}}>Đăng ký thêm ngày Remote mới</div>
+                    <div style={{fontSize:11,color:T.inkMuted}}>Chọn ngày chưa phải Remote muốn làm việc từ xa</div>
+                  </div>
+                  {swapForm.newDays.length > 0 && (
+                    <span style={{fontSize:11,padding:"2px 8px",borderRadius:T.rFull,background:T.successSoft,border:`1px solid ${T.success}30`,color:T.success,fontWeight:700}}>{swapForm.newDays.length} ngày</span>
+                  )}
+                </div>
+
+                <div style={{padding:"12px 14px"}}>
+                  {officeDays.length === 0 ? (
+                    <div style={{padding:"12px",textAlign:"center",fontSize:12,color:T.inkMuted,background:T.surfaceAlt,borderRadius:T.rSm}}>Không có ngày Office nào trong tháng này</div>
+                  ) : (
+                    <div style={{border:`1px solid ${T.border}`,borderRadius:T.rSm,overflow:"hidden",maxHeight:200,overflowY:"auto"}}>
+                      <div style={{display:"grid",gridTemplateColumns:"28px 1fr 52px",background:T.surfaceAlt,borderBottom:`1px solid ${T.border}`,padding:"6px 10px",gap:8}}>
+                        {["✓","Ngày làm việc","Hiện tại"].map((h,i)=>(
+                          <div key={i} style={{fontSize:9,fontWeight:700,color:T.inkMuted,textTransform:"uppercase",letterSpacing:"0.04em"}}>{h}</div>
+                        ))}
+                      </div>
+                      {officeDays.map(({i,d},ri) => {
+                        const ds = d.toISOString().slice(0,10);
+                        const isSel = swapForm.newDays.includes(ds);
+                        const curVal = swapModal.schedule?.[i] || "O";
+                        return (
+                          <div key={i} onClick={()=>toggleNewDay(i)}
+                            style={{display:"grid",gridTemplateColumns:"28px 1fr 52px",padding:"7px 10px",gap:8,borderBottom:ri<officeDays.length-1?`1px solid ${T.borderLight}`:"none",alignItems:"center",cursor:"pointer",background:isSel?T.successSoft:"white",transition:"background 0.1s"}}>
+                            <div style={{width:16,height:16,borderRadius:3,border:`2px solid ${isSel?T.success:T.border}`,background:isSel?T.success:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                              {isSel && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                            </div>
+                            <span style={{fontSize:12,fontWeight:600,color:isSel?T.success:T.ink}}>{fmtD(d)} — {d.toLocaleDateString("vi-VN",{weekday:"short"})}</span>
+                            <span style={{padding:"2px 6px",borderRadius:T.rSm,background:T.surfaceAlt,border:`1px solid ${T.border}`,fontSize:10,fontWeight:700,color:T.inkMuted,textAlign:"center",fontFamily:T.fontM}}>{curVal}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
-              )}
+              </div>
 
               {/* Reason */}
               <div>
-                <label style={{display:"block",fontSize:12,fontWeight:700,color:T.inkSoft,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:6}}>
-                  Lý do điều chỉnh *
-                </label>
+                <label style={{display:"block",fontSize:12,fontWeight:700,color:T.inkSoft,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:6}}>Lý do điều chỉnh *</label>
                 <textarea rows={3} value={swapForm.reason} onChange={e=>setSwapForm(p=>({...p,reason:e.target.value}))}
-                  placeholder={isChange?"VD: Có lịch họp tại văn phòng vào ngày Remote đã đăng ký...":"VD: Cần làm việc từ xa do di chuyển công tác..."}
+                  placeholder="VD: Có lịch di chuyển công tác, cần làm Remote một số ngày..."
                   style={{width:"100%",padding:"9px 12px",borderRadius:T.rSm,border:`1.5px solid ${swapForm.reason.trim()?T.primary:T.border}`,fontSize:13,fontFamily:T.fontB,resize:"vertical",boxSizing:"border-box",outline:"none"}} />
               </div>
 
               {/* Summary preview */}
-              {canSubmit && (
+              {hasAnything && (
                 <div style={{padding:"12px 14px",background:T.successSoft,border:`1px solid ${T.success}30`,borderRadius:T.r}}>
-                  <div style={{fontSize:11,fontWeight:700,color:T.success,marginBottom:8}}>
-                    📋 Tóm tắt — {isChange?`${swapForm.pairs.length} thay đổi`:`${swapForm.newDays.length} ngày mới`}
-                  </div>
-                  {isChange && swapForm.pairs.map((pair,pi) => {
+                  <div style={{fontSize:11,fontWeight:700,color:T.success,marginBottom:8}}>📋 Tóm tắt — {totalChanges} điều chỉnh</div>
+                  {swapForm.pairs.filter(p=>p.toDate).map((pair,pi) => {
                     const origDay = days[pair.fromIdx];
                     return (
-                      <div key={pi} style={{display:"flex",alignItems:"center",gap:10,marginBottom:pi<swapForm.pairs.length-1?5:0,fontSize:12}}>
-                        <span style={{padding:"3px 9px",borderRadius:T.rSm,background:"#FFFBEB",border:"1px solid #FDE68A",fontWeight:700,color:"#92400E",fontFamily:T.fontM}}>R · {fmtD(origDay)}</span>
+                      <div key={pi} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,fontSize:12}}>
+                        <span style={{fontSize:10,padding:"1px 6px",borderRadius:3,background:"#FFFBEB",border:"1px solid #FDE68A",color:"#92400E",fontWeight:700,flexShrink:0}}>ĐỔI</span>
+                        <span style={{fontFamily:T.fontM,fontWeight:600,color:"#92400E"}}>R · {fmtD(origDay)}</span>
                         <span style={{color:T.inkMuted}}>→</span>
-                        <span style={{padding:"3px 9px",borderRadius:T.rSm,background:T.successSoft,border:`1px solid ${T.success}40`,fontWeight:700,color:T.success,fontFamily:T.fontM}}>R · {pair.toDate.slice(8)}/{pair.toDate.slice(5,7)}</span>
+                        <span style={{fontFamily:T.fontM,fontWeight:600,color:T.success}}>R · {pair.toDate.slice(8)}/{pair.toDate.slice(5,7)}</span>
                       </div>
                     );
                   })}
-                  {isAdd && swapForm.newDays.map((ds,di) => (
-                    <div key={ds} style={{display:"flex",alignItems:"center",gap:10,marginBottom:di<swapForm.newDays.length-1?5:0,fontSize:12}}>
-                      <span style={{padding:"3px 9px",borderRadius:T.rSm,background:T.surfaceAlt,border:`1px solid ${T.border}`,fontWeight:700,color:T.inkMuted,fontFamily:T.fontM}}>O · {ds.slice(8)}/{ds.slice(5,7)}</span>
-                      <span style={{color:T.inkMuted}}>→</span>
-                      <span style={{padding:"3px 9px",borderRadius:T.rSm,background:T.successSoft,border:`1px solid ${T.success}40`,fontWeight:700,color:T.success,fontFamily:T.fontM}}>R · {ds.slice(8)}/{ds.slice(5,7)}</span>
+                  {swapForm.newDays.map((ds,di) => (
+                    <div key={ds} style={{display:"flex",alignItems:"center",gap:8,marginBottom:di<swapForm.newDays.length-1?4:0,fontSize:12}}>
+                      <span style={{fontSize:10,padding:"1px 6px",borderRadius:3,background:T.successSoft,border:`1px solid ${T.success}40`,color:T.success,fontWeight:700,flexShrink:0}}>THÊM</span>
+                      <span style={{fontFamily:T.fontM,fontWeight:600,color:T.success}}>R · {ds.slice(8)}/{ds.slice(5,7)}</span>
                     </div>
                   ))}
                 </div>
@@ -9545,7 +9497,7 @@ const WorkSchedulePage = () => {
                 <Btn v="secondary" onClick={()=>setSwapModal(null)}>Hủy</Btn>
                 <Btn disabled={!canSubmit} onClick={confirmSwap}
                   style={{background:canSubmit?"#7C3AED":"#D1D5DB",color:"white",border:"none",opacity:canSubmit?1:0.6}}>
-                  📋 Gửi yêu cầu ({isChange?swapForm.pairs.filter(p=>p.toDate).length:swapForm.newDays.length} ngày)
+                  📋 Gửi yêu cầu ({totalChanges} điều chỉnh)
                 </Btn>
               </div>
             </div>
